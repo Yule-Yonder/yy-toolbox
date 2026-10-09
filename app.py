@@ -1527,20 +1527,25 @@ strong { font-weight: 600; }
 
     def tutor_open_log(self, day: str = '') -> dict:
         """独立窗口展示学习内容日志（近 30 天全文；day 传入时滚动定位并高亮该日）。"""
+        global _LOG_WIN_OPEN
         try:
             _, _, _, _, studylog = self._tutor_mods()
             page = self._tutor_log_page(studylog.recent(30), focus_day=(day or '').strip())
 
             def _open():
+                global _LOG_WIN_OPEN
                 try:
-                    webview.create_window('学习内容日志 · agent-study', html=page, width=780, height=680,
-                                          min_size=(560, 420))
+                    win = webview.create_window('学习内容日志 · agent-study', html=page, width=780, height=680,
+                                                min_size=(560, 420))
+                    win.events.closed += _log_win_closed   # pywebview 运行时建窗非阻塞（Invoke 编组到主 UI 线程 Show 后即返）
                 except Exception:
-                    pass
+                    _LOG_WIN_OPEN = False                  # 建窗失败必须复位，否则 blur 隐藏永久失效
 
-            threading.Thread(target=_open, daemon=True).start()   # 丢工作线程：建窗若阻塞不拖死桥调用
+            _LOG_WIN_OPEN = True                           # 先置位再建窗：面板 blur 事件可能先于建窗返回到达
+            threading.Thread(target=_open, daemon=True).start()
             return {'ok': True}
         except Exception as e:
+            _LOG_WIN_OPEN = False
             return {'ok': False, 'err': str(e)}
 
     def _day_quant(self, day: str) -> dict:
@@ -1851,6 +1856,12 @@ strong { font-weight: 600; }
         "要点两次 Alt+Space 才能关闭"）。"""
         if self.pick_lock:
             return
+        if from_blur and _LOG_WIN_OPEN:
+            # 学习内容详情窗打开期间面板免自动隐藏：否则面板失焦即走宽限期重抢
+            # （_show_win 置顶配方）把刚弹出的详情窗压到身后（=用户实报"详情出现即消失"），
+            # 或走自动隐藏把面板收起（="工具箱也会被隐藏"）。窗口关闭由 _log_win_closed 复位。
+            self._dbg('blur suppressed: log window open')
+            return
         if (from_blur and self.visible and not self.regrabbed
                 and (time.time() - self.shown_at) < 1.5):
             self.regrabbed = True
@@ -1977,6 +1988,13 @@ def ensure_single_instance() -> bool:
 _G_HOTKEY = None
 _G_WINDOW = None
 _G_SHOT = None
+_LOG_WIN_OPEN = False   # 学习内容详情窗存活旗标：存活期间面板免 blur 自动隐藏（hide_panel 读取）
+
+
+def _log_win_closed(*_):
+    """详情窗关闭 → 恢复面板失焦自动隐藏。"""
+    global _LOG_WIN_OPEN
+    _LOG_WIN_OPEN = False
 
 
 def main():
