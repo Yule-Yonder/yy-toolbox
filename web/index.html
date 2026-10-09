@@ -570,21 +570,39 @@
     font-size: 12px; font-family: inherit; color: var(--text-1); background: var(--card-bg); outline: none;
   }
   #tw-note:focus { border-color: var(--accent); }
-  .tw-log { max-height: 150px; overflow-y: auto; border-top: 1px solid var(--divider); margin-top: 6px; padding-top: 4px; }
-  .tw-log .tl {
-    display: flex; align-items: baseline; gap: 7px; font-size: 11.5px; color: var(--text-2);
-    padding: 3px 4px; border-radius: 6px; cursor: pointer;
-    transition: background-color 150ms var(--ease-hover), color 150ms var(--ease-hover);
+  /* 学习内容列表（GitHub 笔记排版风格） */
+  .tw-log { max-height: 200px; overflow-y: auto; border-top: 1px solid var(--divider); margin-top: 8px; padding: 1px 2px 3px; }
+  .tw-day { padding: 6px 2px 7px; }
+  .tw-day + .tw-day { border-top: 1px solid var(--divider); }
+  .tw-day-hd {
+    display: flex; align-items: center; gap: 6px; padding: 2px 6px; margin: 0 -2px;
+    border-radius: 6px; cursor: pointer;
+    transition: background-color 150ms var(--ease-hover);
   }
-  .tw-log .tl:hover { background: var(--subtle-hover); color: var(--accent); }
-  .tw-log .tl .d { flex: none; color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .tw-log .tl .s { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .tw-log .tl .arr { flex: none; color: var(--text-3); font-size: 10px; }
-  .tw-log .tl-detail { font-size: 11.5px; color: var(--text-2); line-height: 1.6; padding: 2px 4px 7px 26px; overflow-wrap: anywhere; }
-  .tw-log .tl-detail .o { color: var(--text-3); }
-  .tw-log .tl.tl-muted { cursor: default; }
-  .tw-log .tl.tl-muted:hover { background: none; color: var(--text-3); }
-  .tw-log .tl-empty { font-size: 11px; color: var(--text-3); text-align: center; padding: 8px 0; }
+  .tw-day-hd:hover { background: var(--subtle-hover); }
+  .tw-day-hd .d { font-size: 12px; font-weight: 600; color: var(--text-1); font-variant-numeric: tabular-nums; }
+  .tw-day-hd .min { font-size: 10.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .tw-day-hd .cnt { font-size: 10.5px; color: var(--text-3); }
+  .tw-day-hd .arr { margin-left: auto; color: var(--text-3); font-size: 10px; transition: transform 150ms var(--ease-hover); }
+  .tw-day.open .tw-day-hd .arr { transform: rotate(90deg); }
+  .tw-pill { flex: none; font-size: 10px; line-height: 1; padding: 2.5px 6px; border-radius: 999px; font-weight: 500; }
+  .tw-pill.minimal { background: rgba(245, 158, 11, .16); color: #D97706; }   /* 双主题通用中亮度琥珀（同 #10B981 绿的用法先例） */
+  .tw-preview { padding: 3px 6px 0 8px; font-size: 11.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tw-day.open .tw-preview { display: none; }
+  .tw-item { display: flex; gap: 6px; padding: 5px 6px 0 8px; font-size: 11.5px; color: var(--text-2); line-height: 1.65; overflow-wrap: anywhere; }
+  .tw-item + .tw-item { margin-top: 7px; }
+  .tw-item .no { flex: none; font-size: 10.5px; color: var(--text-3); font-variant-numeric: tabular-nums; padding-top: 2px; }
+  .tw-item .bd { min-width: 0; }
+  .tw-item .out { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+  .tw-log strong { font-weight: 600; color: var(--text-1); }
+  .tw-log code {
+    font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 86%; background: var(--subtle-hover); border: 1px solid var(--divider);
+    border-radius: 4px; padding: 0 4px; color: var(--text-1);
+  }
+  .tw-note-line { padding: 6px 6px 0 8px; font-size: 11px; color: var(--text-3); overflow-wrap: anywhere; }
+  .tw-muted-row { font-size: 11px; color: var(--text-3); padding: 6px 4px 2px; }
+  .tw-log .tl-empty { font-size: 11px; color: var(--text-3); text-align: center; padding: 10px 0 8px; }
   .rw-recent .rr {
     display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--text-2);
     padding: 3px 4px; cursor: pointer; border-radius: 6px;
@@ -2224,33 +2242,44 @@ const twEsc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').
 let twLogData = null;               // 最近一次内容数据（展开/收起只重渲染，免重拉）
 let twLogOpen = new Set();          // 已展开的日期集合
 
+function twMd(s) {
+  /* mini 行内渲染（GitHub 笔记排版核心）：行内码芯片 + 600 加粗；先转义防注入 */
+  return twEsc(s)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+}
+
 function tutorRenderLog(lg) {
   const box = $('#tw-log');
   if (!lg) { box.innerHTML = '<div class="tl-empty">学习内容不可用</div>'; return; }
   if (!lg.log.length) { box.innerHTML = '<div class="tl-empty">近 7 天暂无学习记录</div>'; return; }
   const rows = [];
-  if (lg.log[0].day !== lg.today) rows.push('<div class="tl tl-muted"><span class="d">今天</span><span class="s">尚无学习记录</span></div>');
+  if (lg.log[0].day !== lg.today) rows.push('<div class="tw-muted-row">今天 · 尚无学习记录</div>');
   lg.log.forEach(day => {
-    const meta = day.minutes != null ? `${day.minutes}min${day.mode === 'minimal' ? '·保签' : ''}` : '';
-    const first = (day.items[0] && day.items[0].content) || day.note || '（无内容备注）';
     const open = twLogOpen.has(day.day);
-    rows.push(
-      `<div class="tl" data-day="${day.day}">` +
-      `<span class="d">${day.day.slice(5)}</span>` +
-      (meta ? `<span class="d">${twEsc(meta)}</span>` : '') +
-      `<span class="s">${twEsc(first)}</span>` +
-      `<span class="arr">${open ? '▲' : '▼'}</span></div>`
-    );
+    const min = day.minutes != null ? `<span class="min">${day.minutes}min</span>` : '';
+    const pill = day.mode === 'minimal' ? '<span class="tw-pill minimal">保签</span>' : '';
+    const cnt = day.items.length > 1 ? `<span class="cnt">${day.items.length} 条</span>` : '';
+    let body;
     if (open) {
-      const parts = [];
-      day.items.forEach(it => {
-        parts.push(`<div>${twEsc(it.content)}</div>`);
-        if (it.output) parts.push(`<div class="o">产出：${twEsc(it.output)}</div>`);
-      });
-      if (day.note && day.items.length) parts.push(`<div class="o">打卡备注：${twEsc(day.note)}</div>`);
-      if (!day.items.length) parts.push(`<div>${twEsc(day.note || '（无内容备注）')}</div>`);
-      rows.push(`<div class="tl-detail">${parts.join('')}</div>`);
+      if (day.items.length) {
+        body = day.items.map((it, i) =>
+          `<div class="tw-item"><span class="no">${i + 1}.</span><span class="bd">${twMd(it.content)}` +
+          (it.output ? `<div class="out">产出：${twMd(it.output)}</div>` : '') + `</span></div>`
+        ).join('');
+        if (day.note) body += `<div class="tw-note-line">备注：${twMd(day.note)}</div>`;
+      } else {
+        body = `<div class="tw-note-line">${twMd(day.note || '（无内容备注）')}</div>`;
+      }
+    } else {
+      const first = day.items[0] ? day.items[0].content : (day.note || '（无内容备注）');
+      body = `<div class="tw-preview">${twMd(first)}</div>`;
     }
+    rows.push(
+      `<div class="tw-day${open ? ' open' : ''}" data-day="${day.day}">` +
+      `<div class="tw-day-hd"><span class="d">${day.day.slice(5)}</span>${min}${pill}${cnt}<span class="arr">▸</span></div>` +
+      body + `</div>`
+    );
   });
   box.innerHTML = rows.join('');
 }
@@ -2280,9 +2309,11 @@ async function tutorCheckin(mode) {
 $('#tw-full').addEventListener('click', () => tutorCheckin('full'));
 $('#tw-minimal').addEventListener('click', () => tutorCheckin('minimal'));
 $('#tw-log').addEventListener('click', ev => {
-  const row = ev.target.closest('.tl[data-day]');
-  if (!row) return;
-  const d = row.dataset.day;
+  const hd = ev.target.closest('.tw-day-hd');   // 只点日期行折叠，正文区可正常划选文字
+  if (!hd) return;
+  const day = hd.closest('.tw-day[data-day]');
+  if (!day) return;
+  const d = day.dataset.day;
   if (twLogOpen.has(d)) twLogOpen.delete(d); else twLogOpen.add(d);
   tutorRenderLog(twLogData);          // 展开/收起只重渲染，不重拉
 });
