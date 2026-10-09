@@ -1548,6 +1548,43 @@ strong { font-weight: 600; }
             _LOG_WIN_OPEN = False
             return {'ok': False, 'err': str(e)}
 
+    def tutor_month_checkins(self, year: int, month: int) -> dict:
+        """某月每日学习打卡数据（日历✓标识数据源）：{ISO日期: {minutes, mode, note}}。"""
+        try:
+            y, m = int(year), int(month)
+            if not (1 <= m <= 12):
+                return {'ok': False, 'days': {}, 'err': '月份非法'}
+            checkin, _, _, _, _ = self._tutor_mods()
+            data = checkin.load_checkins()
+            prefix = f'{y:04d}-{m:02d}-'
+            days = {k: {'minutes': v.get('minutes'), 'mode': v.get('mode'), 'note': v.get('note', '')}
+                    for k, v in data.items() if k.startswith(prefix)}
+            return {'ok': True, 'days': days}
+        except Exception as e:
+            return {'ok': False, 'days': {}, 'err': str(e)}
+
+    def tutor_edit_checkin(self, day: str, minutes: int) -> dict:
+        """修改历史打卡的学习时长（保留原 mode/note；日历详情区入口，仅限已有打卡的日子）。"""
+        try:
+            d = str(day or '').strip()
+            if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', d):
+                return {'ok': False, 'err': '日期格式非法'}
+            m = int(minutes)
+            if not (1 <= m <= 600):
+                return {'ok': False, 'err': '时长需在 1-600 分钟之间'}
+            checkin, _, _, _, _ = self._tutor_mods()
+            data = checkin.load_checkins()
+            entry = data.get(d)
+            if not entry:
+                return {'ok': False, 'err': '该日无学习打卡记录（不支持补卡）'}
+            rec = checkin.record_checkin(date.fromisoformat(d), m,
+                                         entry.get('mode', 'full'), (entry.get('note') or '')[:200])
+            stats = checkin.compute_stats()
+            return {'ok': True, 'minutes': rec.minutes, 'hours': stats.hours,
+                    'total_days': stats.total_days, 'current_streak': stats.current}
+        except Exception as e:
+            return {'ok': False, 'err': str(e)}
+
     def _day_quant(self, day: str) -> dict:
         """按日量化（待办），口径与前端 todayQuant() 一致；保存日报时快照入库。
         pomo 两字段恒 0（番茄钟功能 2026-09-22 删除），保留占位维持 reports 表 16 列结构。"""

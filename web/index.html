@@ -417,6 +417,7 @@
   .cal-cell i.r { background: #E5484D; }
   .cal-cell i.y { background: #F5A623; color: #4A2B00; }
   .cal-cell i.g { background: #10B981; }
+  .cal-cell i.stu { left: 3px; right: auto; background: #10B981; color: #fff; }   /* 左上角绿✓=当日有学习打卡（tutor 桥） */
   .cal-detail { margin-top: 10px; border-top: 1px solid var(--divider); padding-top: 8px; min-height: 64px; max-height: 148px; overflow-y: auto; }
   .cal-detail .cd-title { font-size: 12px; color: var(--text-2); margin-bottom: 4px; }
   .cal-detail .cd-empty { font-size: 12px; color: var(--text-3); padding: 14px 0; text-align: center; }
@@ -653,6 +654,14 @@
   .cal-detail .cd-rep { display: flex; align-items: center; gap: 8px; padding: 6px 2px; font-size: 12px; color: var(--text-2); border-top: 1px dashed var(--divider); margin-top: 6px; }
   /* 日报行上移后，待办明细包此容器承接与日报行之间的虚线分隔（无待办日不渲染容器，避免多一条孤线） */
   .cal-detail .cd-items { border-top: 1px dashed var(--divider); margin-top: 6px; }
+  .cal-detail .cd-study { display: flex; align-items: center; gap: 8px; padding: 6px 2px; font-size: 12px; color: var(--text-2); border-top: 1px dashed var(--divider); margin-top: 6px; }
+  .cal-detail .cd-study b { font-weight: 600; color: var(--text-1); font-variant-numeric: tabular-nums; }
+  .cal-detail .cd-study .cd-stu-none { color: var(--text-3); }
+  .cal-detail .cd-study input {
+    width: 56px; padding: 3px 6px; border: 1px solid var(--card-border); border-radius: var(--radius-sm);
+    font-size: 12px; font-family: inherit; color: var(--text-1); background: var(--card-bg); outline: none;
+  }
+  .cal-detail .cd-study input:focus { border-color: var(--accent); }
 
   /* ========== 模态（Acrylic：遮罩+弹窗双层 backdrop-filter；必须直挂 body，防 backdrop root 截断） ========== */
   #modal-mask {
@@ -1391,11 +1400,20 @@ function todoDayMap() {
 }
 
 let calY = 2026, calM = 0, calSel = null;
+let CAL_STUDY = {};   // 当前展示月份的学习打卡数据：ISO 日期 → {minutes, mode, note}（tutor_month_checkins 桥）
+
+async function fetchCalStudy() {
+  try {
+    const r = await api.tutor_month_checkins(calY, calM + 1);
+    CAL_STUDY = (r && r.ok) ? r.days : {};
+  } catch (e) { CAL_STUDY = {}; }   // 桥不可用静默：✓ 不显示，不影响日历其他功能
+}
 
 async function showCalendar() {
   try { REP.dates = new Set(await api.report_dates()); } catch (e) { /* 桥未就绪等，静默 */ }
   const now = new Date();
   calY = now.getFullYear(); calM = now.getMonth(); calSel = null;
+  await fetchCalStudy();
   renderCalendar();
 }
 
@@ -1416,7 +1434,9 @@ function renderCalendar() {
       const cls = done === 0 ? 'r' : done === n ? 'g' : 'y';   // 全未闭环红/部分黄/全闭环绿
       badge = `<i class="${cls}">${done}/${n}</i>`;
     }
-    cells += `<button class="cal-cell${k === todayK ? ' today' : ''}${n ? ' has' : ''}${calSel === k ? ' sel' : ''}" data-k="${k}">${d}${badge}${REP.dates.has(k) ? '<span class="rep-dot" title="有日报"></span>' : ''}</button>`;
+    const stu = CAL_STUDY[k];
+    const stuBadge = stu ? `<i class="stu" title="已学习 ${stu.minutes} 分钟${stu.mode === 'minimal' ? '（保签）' : ''}">✓</i>` : '';
+    cells += `<button class="cal-cell${k === todayK ? ' today' : ''}${n ? ' has' : ''}${calSel === k ? ' sel' : ''}" data-k="${k}">${d}${stuBadge}${badge}${REP.dates.has(k) ? '<span class="rep-dot" title="有日报"></span>' : ''}</button>`;
   }
   m.innerHTML = `
     <div class="cal-head">
@@ -1430,8 +1450,8 @@ function renderCalendar() {
     <div class="btns" style="margin-top:10px"><button class="primary" id="m-ok">关闭</button></div>`;
   $('#modal-mask').classList.add('show');
   $('#m-ok').addEventListener('click', closeModal);
-  $('#cal-prev').addEventListener('click', () => { calM--; if (calM < 0) { calM = 11; calY--; } calSel = null; renderCalendar(); });
-  $('#cal-next').addEventListener('click', () => { calM++; if (calM > 11) { calM = 0; calY++; } calSel = null; renderCalendar(); });
+  $('#cal-prev').addEventListener('click', async () => { calM--; if (calM < 0) { calM = 11; calY--; } calSel = null; await fetchCalStudy(); renderCalendar(); });
+  $('#cal-next').addEventListener('click', async () => { calM++; if (calM > 11) { calM = 0; calY++; } calSel = null; await fetchCalStudy(); renderCalendar(); });
   m.querySelectorAll('.cal-cell[data-k]').forEach(c =>
     c.addEventListener('click', () => renderCalDetail(c.dataset.k, map)));
   renderCalDetail(calSel, map);
@@ -1454,7 +1474,32 @@ function renderCalDetail(k, map) {
       <button class="mini-btn" id="cd-rep-open">${hasRep ? '查看 / 编辑' : '生成该日日报'}</button></div>`;
   // 日报行紧贴标题（用户 2026-09-22 定版：日报在待办闭环上面）；待办条目有内容才包容器承接虚线分隔
   const rowsHtml = rows.length ? `<div class="cd-items">${rows.join('')}</div>` : '';
-  box.innerHTML = `<div class="cd-title">${d.getMonth() + 1} 月 ${d.getDate()} 日 · ${rows.length ? `${e.open.length} 进行 / ${e.closed.length} 闭环` : '无待办记录'}</div>${repRow}${rowsHtml}`;
+  const stu = CAL_STUDY[k];
+  const studyRow = stu
+    ? `<div class="cd-study" id="cd-study"><span>⏱ 已学习 <b>${stu.minutes}</b> 分钟${stu.mode === 'minimal' ? '（保签）' : ''}</span><span style="flex:1"></span><button class="mini-btn" id="cd-stu-edit" title="修改该日学习时长">修改时长</button></div>`
+    : `<div class="cd-study"><span class="cd-stu-none">无学习打卡</span></div>`;
+  box.innerHTML = `<div class="cd-title">${d.getMonth() + 1} 月 ${d.getDate()} 日 · ${rows.length ? `${e.open.length} 进行 / ${e.closed.length} 闭环` : '无待办记录'}</div>${studyRow}${repRow}${rowsHtml}`;
+  const stuEdit = $('#cd-stu-edit');
+  if (stuEdit) stuEdit.addEventListener('click', () => {
+    $('#cd-study').innerHTML = `<span>时长</span><input id="cd-stu-min" type="number" min="1" max="600" value="${CAL_STUDY[k].minutes}"><span>分钟</span><span style="flex:1"></span><button class="mini-btn" id="cd-stu-cancel">取消</button><button class="mini-btn" id="cd-stu-save">保存</button>`;
+    const inp = $('#cd-stu-min');
+    inp.focus(); inp.select();
+    const save = async () => {
+      const v = parseInt(inp.value, 10);
+      if (!v || v < 1 || v > 600) return toast('⚠️ 时长需在 1-600 分钟之间');
+      const r = await api.tutor_edit_checkin(k, v).catch(() => null);
+      if (r && r.ok) {
+        CAL_STUDY[k].minutes = v;
+        toast(`已修改 ${k} 学习时长为 ${v} 分钟 ✓`);
+      } else {
+        toast('修改失败：' + (r && r.err ? r.err : 'tutor 不可用'));
+      }
+      renderCalDetail(k, map);   // 成功回显新值；失败同样退出编辑态（toast 已提示原因）
+    };
+    $('#cd-stu-cancel').addEventListener('click', () => renderCalDetail(k, map));
+    $('#cd-stu-save').addEventListener('click', save);
+    inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') save(); });
+  });
   const items = box.querySelectorAll('.cd-item');
   const all = [...e.open, ...e.closed];
   items.forEach((el, i) => { el.querySelector('.tx').textContent = all[i].text; });   // textContent 防注入
