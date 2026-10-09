@@ -350,6 +350,7 @@
   #w-report .rw-recent { width: 100%; }
   .widget.show { display: flex; }
   #w-notes { align-items: stretch; }   /* 记事本编辑区拉伸全宽（center 会让宽度随内容伸缩） */
+  #w-tutor { align-items: stretch; width: 100%; }   /* 同 #w-report/#w-notes：不拉伸会让统计条与列表缩成内容宽（截图实锤"居中一坨"） */
 
   /* .pomo-btns / .pomo-go 原为番茄钟样式，现仅日报 widget 复用 */
   .pomo-btns { display: flex; align-items: center; gap: 8px; width: 100%; padding-top: 6px; }
@@ -561,7 +562,7 @@
   }
   #tw-min:focus { border-color: var(--accent); }
   .tw-week { display: flex; gap: 5px; padding: 6px 2px 2px; }
-  .tw-d { flex: 1; height: 13px; border-radius: 4px; background: var(--subtle-hover); }
+  .tw-d { flex: 1; height: 13px; border-radius: 4px; background: var(--subtle-hover); border: 1px solid var(--divider); }
   .tw-d.full { background: var(--accent); }
   .tw-d.minimal { background: var(--accent); opacity: .5; }
   #tw-note {
@@ -570,39 +571,37 @@
     font-size: 12px; font-family: inherit; color: var(--text-1); background: var(--card-bg); outline: none;
   }
   #tw-note:focus { border-color: var(--accent); }
-  /* 学习内容列表（GitHub 笔记排版风格） */
-  .tw-log { max-height: 200px; overflow-y: auto; border-top: 1px solid var(--divider); margin-top: 8px; padding: 1px 2px 3px; }
-  .tw-day { padding: 6px 2px 7px; }
-  .tw-day + .tw-day { border-top: 1px solid var(--divider); }
-  .tw-day-hd {
-    display: flex; align-items: center; gap: 6px; padding: 2px 6px; margin: 0 -2px;
-    border-radius: 6px; cursor: pointer;
+  /* 学习内容（GitHub 笔记排版；条目点击 → 独立窗口看近 30 天全文） */
+  .tw-cap { display: flex; justify-content: space-between; align-items: baseline; font-size: 10.5px; color: var(--text-3); margin: 9px 2px 0; border-top: 1px solid var(--divider); padding-top: 7px; }
+  #tw-all { cursor: pointer; }
+  #tw-all:hover { color: var(--accent); }
+  .tw-log { max-height: 170px; overflow-y: auto; margin-top: 3px; }
+  .tw-row {
+    display: flex; align-items: baseline; gap: 6px; font-size: 11.5px; color: var(--text-2);
+    padding: 4px 6px; border-radius: 6px; cursor: pointer;
     transition: background-color 150ms var(--ease-hover);
   }
-  .tw-day-hd:hover { background: var(--subtle-hover); }
-  .tw-day-hd .d { font-size: 12px; font-weight: 600; color: var(--text-1); font-variant-numeric: tabular-nums; }
-  .tw-day-hd .min { font-size: 10.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
-  .tw-day-hd .cnt { font-size: 10.5px; color: var(--text-3); }
-  .tw-day-hd .arr { margin-left: auto; color: var(--text-3); font-size: 10px; transition: transform 150ms var(--ease-hover); }
-  .tw-day.open .tw-day-hd .arr { transform: rotate(90deg); }
-  .tw-pill { flex: none; font-size: 10px; line-height: 1; padding: 2.5px 6px; border-radius: 999px; font-weight: 500; }
-  .tw-pill.minimal { background: rgba(245, 158, 11, .16); color: #D97706; }   /* 双主题通用中亮度琥珀（同 #10B981 绿的用法先例） */
-  .tw-preview { padding: 3px 6px 0 8px; font-size: 11.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tw-day.open .tw-preview { display: none; }
-  .tw-item { display: flex; gap: 6px; padding: 5px 6px 0 8px; font-size: 11.5px; color: var(--text-2); line-height: 1.65; overflow-wrap: anywhere; }
-  .tw-item + .tw-item { margin-top: 7px; }
-  .tw-item .no { flex: none; font-size: 10.5px; color: var(--text-3); font-variant-numeric: tabular-nums; padding-top: 2px; }
-  .tw-item .bd { min-width: 0; }
-  .tw-item .out { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+  .tw-row:hover { background: var(--subtle-hover); }
+  .tw-row:hover .d { color: var(--accent); }
+  .tw-row .d { flex: none; font-weight: 600; color: var(--text-1); font-variant-numeric: tabular-nums; }
+  .tw-row .min { flex: none; font-size: 10.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .tw-row .s { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tw-row .arr { flex: none; color: var(--text-3); }
+  .tw-pill { flex: none; align-self: center; font-size: 10px; line-height: 1; padding: 2px 6px; border-radius: 999px; font-weight: 500; }
+  .tw-pill.minimal { background: rgba(245, 158, 11, .16); color: #D97706; }
   .tw-log strong { font-weight: 600; color: var(--text-1); }
   .tw-log code {
     font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
     font-size: 86%; background: var(--subtle-hover); border: 1px solid var(--divider);
     border-radius: 4px; padding: 0 4px; color: var(--text-1);
   }
-  .tw-note-line { padding: 6px 6px 0 8px; font-size: 11px; color: var(--text-3); overflow-wrap: anywhere; }
-  .tw-muted-row { font-size: 11px; color: var(--text-3); padding: 6px 4px 2px; }
+  .tw-muted-row { font-size: 11px; color: var(--text-3); padding: 5px 6px 2px; }
   .tw-log .tl-empty { font-size: 11px; color: var(--text-3); text-align: center; padding: 10px 0 8px; }
+  /* 概览统计条（GitHub profile stats 风：值加粗 + 标签弱化） */
+  .tw-stats { display: flex; gap: 6px; width: 100%; }
+  .tw-stat { flex: 1; text-align: center; padding: 7px 4px 6px; background: var(--subtle-hover); border-radius: var(--radius-md); }
+  .tw-stat .v { font-size: 13px; font-weight: 600; color: var(--text-1); font-variant-numeric: tabular-nums; }
+  .tw-stat .l { font-size: 10px; color: var(--text-3); margin-top: 1px; }
   .rw-recent .rr {
     display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--text-2);
     padding: 3px 4px; cursor: pointer; border-radius: 6px;
@@ -825,23 +824,24 @@
         </div>
         <div id="rw-recent" class="rw-recent"></div>
       </div>
-      <!-- ★ 学习：agent-study 学习系统概览（连续/累计/到期卡）+ 一键打卡/保签 -->
+      <!-- ★ 学习：agent-study 学习系统概览 + 一键打卡/保签 + 学习内容日志（条目点击独立窗口看全文） -->
       <div class="widget" id="w-tutor">
-        <div class="rw-board-row">
-          <span id="tw-streak" class="rb-num" title="当前连续天数（断签只清这个）">连续 –</span><span class="rb-sep">·</span>
-          <span id="tw-total" class="rb-num" title="历史累计出勤天数与小时（永不归零）">累计 –</span><span class="rb-sep">·</span>
-          <span id="tw-due" class="rb-num" title="Obsidian 到期复习卡（点开 Obsidian 刷卡）">到期 –</span>
+        <div class="tw-stats">
+          <div class="tw-stat" id="tw-streak" title="当前连续天数（断签只清这个）"><div class="v">–</div><div class="l">当前连续</div></div>
+          <div class="tw-stat" id="tw-total" title="历史累计出勤时长与天数（永不归零）"><div class="v">–</div><div class="l">累计出勤</div></div>
+          <div class="tw-stat" id="tw-due" title="Obsidian 到期复习卡（点开 Obsidian 刷卡）"><div class="v">–</div><div class="l">到期复习卡</div></div>
         </div>
         <div id="tw-plan" class="tw-plan">加载中…</div>
         <input id="tw-note" type="text" maxlength="200" placeholder="今天学了什么（可空，随打卡记录）" title="一句话学习内容，展示在下方「学习内容」里">
         <div class="pomo-btns" style="margin:8px 0 6px">
           <input id="tw-min" type="number" min="1" max="600" value="110" title="学习时长（分钟）">
-          <button id="tw-full" class="pomo-go">打卡</button>
           <span style="flex:1"></span>
           <button id="tw-minimal" class="mini-btn" title="≥15 分钟最低承诺，保住连续记录">保签</button>
+          <button id="tw-full" class="pomo-go">打卡</button>
         </div>
         <div id="tw-week" class="tw-week"></div>
-        <div id="tw-log" class="tw-log" title="近 7 天学习内容（progress.md 学习记录表 + 打卡备注）"></div>
+        <div class="tw-cap"><span>学习内容 · 近 7 天</span><span id="tw-all" title="独立窗口查看近 30 天全文">全部 ›</span></div>
+        <div id="tw-log" class="tw-log"></div>
       </div>
     </div>
   </section>
@@ -2225,9 +2225,9 @@ async function tutorRefresh() {
       ? `tutor 不可用：${s.err}` : 'tutor 不可用（D:\\dev\\project\\agent-study 未就绪？）';
     return;
   }
-  $('#tw-streak').textContent = `连续 ${s.current_streak} 天`;
-  $('#tw-total').textContent = `累计 ${s.total_days} 天 / ${s.hours}h`;
-  $('#tw-due').textContent = `到期 ${s.due} 张`;
+  $('#tw-streak').innerHTML = `<div class="v">${s.current_streak} 天</div><div class="l">当前连续</div>`;
+  $('#tw-total').innerHTML = `<div class="v">${s.hours}h</div><div class="l">累计 ${s.total_days} 天</div>`;
+  $('#tw-due').innerHTML = `<div class="v">${s.due} 张</div><div class="l">到期复习卡</div>`;
   const warn = s.warnings && s.warnings.length ? `（${s.warnings[0]}）` : '';
   $('#tw-plan').textContent = `${s.headline}${warn}${s.done_today ? ' · 今日已打卡 ✅' : ''}`;
   // 近 7 日出勤格子（旧→今）：实心=完整学习 / 半透明=保签 / 灰=缺
@@ -2239,8 +2239,7 @@ async function tutorRefresh() {
 
 /* 学习内容日志（tutor_log 桥）：progress.md「学习记录」表为主体 + 打卡备注兜底 */
 const twEsc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-let twLogData = null;               // 最近一次内容数据（展开/收起只重渲染，免重拉）
-let twLogOpen = new Set();          // 已展开的日期集合
+let twLogData = null;               // 最近一次内容数据（tab 切回先渲染缓存再刷新）
 
 function twMd(s) {
   /* mini 行内渲染（GitHub 笔记排版核心）：行内码芯片 + 600 加粗；先转义防注入 */
@@ -2256,29 +2255,14 @@ function tutorRenderLog(lg) {
   const rows = [];
   if (lg.log[0].day !== lg.today) rows.push('<div class="tw-muted-row">今天 · 尚无学习记录</div>');
   lg.log.forEach(day => {
-    const open = twLogOpen.has(day.day);
-    const min = day.minutes != null ? `<span class="min">${day.minutes}min</span>` : '';
-    const pill = day.mode === 'minimal' ? '<span class="tw-pill minimal">保签</span>' : '';
-    const cnt = day.items.length > 1 ? `<span class="cnt">${day.items.length} 条</span>` : '';
-    let body;
-    if (open) {
-      if (day.items.length) {
-        body = day.items.map((it, i) =>
-          `<div class="tw-item"><span class="no">${i + 1}.</span><span class="bd">${twMd(it.content)}` +
-          (it.output ? `<div class="out">产出：${twMd(it.output)}</div>` : '') + `</span></div>`
-        ).join('');
-        if (day.note) body += `<div class="tw-note-line">备注：${twMd(day.note)}</div>`;
-      } else {
-        body = `<div class="tw-note-line">${twMd(day.note || '（无内容备注）')}</div>`;
-      }
-    } else {
-      const first = day.items[0] ? day.items[0].content : (day.note || '（无内容备注）');
-      body = `<div class="tw-preview">${twMd(first)}</div>`;
-    }
+    const first = day.items[0] ? day.items[0].content : (day.note || '（无内容备注）');
     rows.push(
-      `<div class="tw-day${open ? ' open' : ''}" data-day="${day.day}">` +
-      `<div class="tw-day-hd"><span class="d">${day.day.slice(5)}</span>${min}${pill}${cnt}<span class="arr">▸</span></div>` +
-      body + `</div>`
+      `<div class="tw-row" data-day="${day.day}" title="点击在独立窗口查看全文">` +
+      `<span class="d">${day.day.slice(5)}</span>` +
+      (day.minutes != null ? `<span class="min">${day.minutes}min</span>` : '') +
+      (day.mode === 'minimal' ? '<span class="tw-pill minimal">保签</span>' : '') +
+      (day.items.length > 1 ? `<span class="min">${day.items.length} 条</span>` : '') +
+      `<span class="s">${twMd(first)}</span><span class="arr">›</span></div>`
     );
   });
   box.innerHTML = rows.join('');
@@ -2309,14 +2293,11 @@ async function tutorCheckin(mode) {
 $('#tw-full').addEventListener('click', () => tutorCheckin('full'));
 $('#tw-minimal').addEventListener('click', () => tutorCheckin('minimal'));
 $('#tw-log').addEventListener('click', ev => {
-  const hd = ev.target.closest('.tw-day-hd');   // 只点日期行折叠，正文区可正常划选文字
-  if (!hd) return;
-  const day = hd.closest('.tw-day[data-day]');
-  if (!day) return;
-  const d = day.dataset.day;
-  if (twLogOpen.has(d)) twLogOpen.delete(d); else twLogOpen.add(d);
-  tutorRenderLog(twLogData);          // 展开/收起只重渲染，不重拉
+  const row = ev.target.closest('.tw-row[data-day]');
+  if (!row) return;
+  api.tutor_open_log(row.dataset.day).catch(() => {});   // 独立窗口看近 30 天全文并定位到该日
 });
+$('#tw-all').addEventListener('click', () => api.tutor_open_log('').catch(() => {}));
 
 
 /* ========== 右侧小工具区：tab 切换机制（后续追加 WIDGETS 即可） ========== */

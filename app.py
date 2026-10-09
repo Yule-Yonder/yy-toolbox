@@ -1390,6 +1390,41 @@ class Api:
     # 免 subprocess 跑 CLI 再解析文本（中文输出有 GBK/UTF-8 双层转码坑）。
     _TUTOR_ROOT = r'D:\dev\project\agent-study'
 
+    # 独立窗口（tutor_open_log）静态页样式：GitHub 亮/暗双色板，随系统主题自适应
+    _TUTOR_LOG_CSS = r"""
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #ffffff; color: #1f2328;
+       font: 14px/1.75 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; }
+main { max-width: 780px; margin: 0 auto; padding: 30px 36px 60px; }
+h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; letter-spacing: .2px; }
+.sub { color: #59636e; font-size: 12.5px; margin: 0 0 10px; }
+.day { padding: 18px 0 16px; border-top: 1px solid #d1d9e0; }
+.day.focus { background: rgba(9,105,218,.06); outline: 2px solid rgba(9,105,218,.25);
+             border-radius: 10px; padding: 18px 14px 14px; margin: 0 -14px; }
+h2 { font-size: 15px; font-weight: 600; margin: 0; font-variant-numeric: tabular-nums; }
+.meta { color: #59636e; font-size: 12px; margin: 2px 0 10px; display: flex; gap: 8px; align-items: center; }
+.pill { background: rgba(245,158,11,.16); color: #9a6700; font-size: 11px;
+        padding: 2px 8px; border-radius: 999px; font-weight: 500; }
+.item { display: flex; gap: 10px; margin: 10px 0; }
+.item .no { color: #59636e; font-size: 12px; flex: none; padding-top: 1px; font-variant-numeric: tabular-nums; }
+.item .bd { min-width: 0; }
+.out { color: #59636e; font-size: 12.5px; margin-top: 2px; }
+.note { color: #59636e; font-size: 12.5px; margin-top: 10px; }
+code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+       font-size: 85%; background: rgba(129,139,152,.12); border-radius: 4px; padding: .1em .35em; }
+strong { font-weight: 600; }
+.empty { color: #59636e; text-align: center; padding: 80px 0; font-size: 13px; }
+@media (prefers-color-scheme: dark) {
+  body { background: #0d1117; color: #e6edf3; }
+  .sub, .meta, .item .no, .out, .note, .empty { color: #8b949e; }
+  .day { border-top-color: #21262d; }
+  .day.focus { background: rgba(56,139,253,.12); outline-color: rgba(56,139,253,.4); }
+  .pill { color: #d29922; }
+  code { background: rgba(110,118,129,.25); }
+}
+"""
+
     def _tutor_mods(self):
         if self._TUTOR_ROOT not in sys.path:
             sys.path.insert(0, self._TUTOR_ROOT)
@@ -1443,6 +1478,70 @@ class Api:
             }
         except Exception as e:
             return {'ok': False, 'log': [], 'err': str(e)}
+
+    def _tutor_log_page(self, logs, focus_day: str = '') -> str:
+        """学习内容日志 → 独立窗口静态页（GitHub 风格排版，预渲染零 JS 依赖，仅定位日一段脚本）。"""
+        def esc(s):
+            return (s or '').replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
+
+        def md(s):
+            h = esc(s)
+            h = re.sub(r'`([^`]+)`', r'<code>\1</code>', h)
+            h = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', h)
+            return h
+
+        sections = []
+        for d in logs:
+            bits = []
+            if d.minutes is not None:
+                bits.append(f'{d.minutes} 分钟')
+            if d.mode == 'minimal':
+                bits.append('<span class="pill">保签</span>')
+            if d.items:
+                bits.append(f'{len(d.items)} 条学习条目')
+            items = ''.join(
+                f'<div class="item"><span class="no">{i + 1}.</span><div class="bd">{md(it.content)}'
+                + (f'<div class="out">产出：{md(it.output)}</div>' if it.output else '')
+                + '</div></div>'
+                for i, it in enumerate(d.items)
+            )
+            if not items:
+                items = f'<div class="note">{md(d.note or "（无内容备注）")}</div>'
+            elif d.note:
+                items += f'<div class="note">打卡备注：{md(d.note)}</div>'
+            meta = ' · '.join(bits) if bits else '未打卡'
+            focus = ' focus' if d.day == focus_day else ''
+            sections.append(
+                f'<section class="day{focus}" id="d{d.day}"><h2>{d.day}</h2>'
+                f'<div class="meta">{meta}</div>{items}</section>'
+            )
+        body = ''.join(sections) or '<div class="empty">近 30 天暂无学习记录</div>'
+        scroll = (f"var el=document.getElementById('d{focus_day}');"
+                  f"if(el)el.scrollIntoView({{block:'center'}});") if focus_day else ''
+        ts = time.strftime('%Y-%m-%d %H:%M')
+        return ('<!doctype html><html><head><meta charset="utf-8"><title>学习内容日志 · agent-study</title>'
+                f'<style>{self._TUTOR_LOG_CSS}</style></head><body><main>'
+                f'<h1>学习内容日志</h1>'
+                f'<p class="sub">近 30 天 · 汇总自 progress.md「学习记录」表与打卡备注 · 生成于 {ts}</p>'
+                f'{body}</main><script>{scroll}</script></body></html>')
+
+    def tutor_open_log(self, day: str = '') -> dict:
+        """独立窗口展示学习内容日志（近 30 天全文；day 传入时滚动定位并高亮该日）。"""
+        try:
+            _, _, _, _, studylog = self._tutor_mods()
+            page = self._tutor_log_page(studylog.recent(30), focus_day=(day or '').strip())
+
+            def _open():
+                try:
+                    webview.create_window('学习内容日志 · agent-study', html=page, width=780, height=680,
+                                          min_size=(560, 420))
+                except Exception:
+                    pass
+
+            threading.Thread(target=_open, daemon=True).start()   # 丢工作线程：建窗若阻塞不拖死桥调用
+            return {'ok': True}
+        except Exception as e:
+            return {'ok': False, 'err': str(e)}
 
     def _day_quant(self, day: str) -> dict:
         """按日量化（待办），口径与前端 todayQuant() 一致；保存日报时快照入库。
