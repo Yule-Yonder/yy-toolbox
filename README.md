@@ -17,7 +17,7 @@
 ├─ data/
 │  ├─ config.json    # 分组+待办+外部目录+上次分组+自定义应用（groups/ungrouped/todos/todo_history/external_dirs/active_group/apps/bg_enabled）
 │  ├─ icons/         # 自定义应用图标缓存（exe 提取的 PNG，随移除清理）
-│  ├─ _toast.ps1     # 番茄钟到点通知用 toast 脚本（运行时自动生成，utf-8-sig）
+│  ├─ _toast.ps1     # 系统 toast 通知脚本（素材 OCR 完成提示等；运行时自动生成，utf-8-sig）
 │  ├─ reports/       # 工作日报归档（YYYY-MM-DD.md，日历蓝点与「查看/编辑」数据源）
 │  └─ _toggle.log    # 调试日志（联调观测用，git 忽略）
 ├─ .venv/            # 独立虚拟环境
@@ -61,7 +61,7 @@ TOOLS.md 登记新工具（create-tool skill 流程）后，面板下次唤起�
 - 已删工具自动清出、新工具自动进未分组
 
 ## 当前状态：源码 ↔ release 同步性
-无 exe 存档（纯源码运行；如需分发可后续 PyInstaller onefile 打包，注意 web/index.html 与 data/ 需随 exe 同目录分发）。
+release/YY工具箱.exe（onedir）存档于 2026-09-11，已落后于 09-15/09-22 与 10-08/10-09 多轮迭代（学习 widget 及学习内容汇总均不在 exe 内）。按「不默默重打包」纪律保持待发布，重新打包（§6 onefile 命令，web/index.html 与 data/ 需随 exe 同目录）并验证后再标记同步。
 
 ## 已知限制（联调实锤的坑，迭代前必读）
 1. **pywebview 锁定 5.4**：6.2.1 存在 native 对象代理递归爆栈（`Rectangle.op_Equality` 错误串）+ 跨线程 show/evaluate_js 静默失败/延迟数十秒生效
@@ -121,3 +121,10 @@ TOOLS.md 登记新工具（create-tool skill 流程）后，面板下次唤起�
 - 2026-09-08 主面板默认高度 640→800（+25%，用户实锤部分区域展示不全）；宽度与三列卡片布局不动（客户区 924 无横向滚动），前端右键菜单位置为 innerHeight 动态计算无需同步
 - 2026-09-08 日报向导弹窗宽度 580→650px（+12%，用户要求加宽编辑区）；「重新扫描」按钮从步骤①顶部行移到弹窗底部栏左下角（常驻 foot、仅步骤①显示，绑定移 buildReportShell 防重复绑定）
 - 2026-09-09 维护历史日报直达（用户拍板「选日期直达编辑」）：步骤①换日期时该日已有归档或未保存草稿 → 跳过步骤②③空走直达编辑页（draft 优先、有草稿回编辑态）；widget 最近日报流 3→7 条作主要翻查入口；顺带清掉上一轮遗留：renderRepStep1 内对 foot 按钮 #rw-scan 的重复绑定
+- 2026-09-15 删除应用功能（用户要求"把部分应用从工具箱里面移除"）：config 加 hidden 名单统一过滤 all_tools 出口（reconcile 自动清分组残留），右键从「仅 app/dir 卡可移除」扩展为全卡片——app:{id} 自定义卡（含 html 卡，顺带修掉 type 判断漏洞致其此前右键无菜单）走既有 remove_app 彻底移除，根目录自研工具 / ext: 外部卡走新 hide_tool 隐藏（文件与 TOOLS.md 不动，可恢复）；header 新增「隐藏项」按钮弹恢复列表（hidden_tools 自愈清理已失效条目）。测试放 empty/工具箱启动器/hide_test.py 22/22（hide 幂等/app: 拒绝/ext: 隐藏/reconcile 清残留/自愈/remove_app 回归），日报回归 85/85
+- 2026-09-22 日报体例改版（用户定版"直接 1、2、3 罗列"）：正文禁用一切小节标题字样——REPORT_BODY_HINT / build_report_prompt 由四节结构（今日完成/微信工作沟通要点/其他事项/问题与风险）改为纯编号条目（全文至多 6 条、每条一句话，微信沟通/领导临时安排/问题风险直接混排为编号条目不单独成节）；前端 mdToHtml 补编号条目渲染分支（.md-oli，认 "1. / 1、/ 1)" 三型，点号后须空格防误吞"3.5 天"类行）；存量日报启动时自动迁移（migrate_report_style：PRAGMA user_version 幂等闸门 + 执行前整库与 md 备份至 data/reports_backup_*（assets 不入备份），删节标题行、'- ' 条目改递增编号、md 副本同步写回、summary 重算；已导出到外部日报目录的历史副本不回改，需要时重新「另存」）；顺带修 load_config 缺 pomo_log setdefault（配置无该键时番茄钟按日量化恒为 0 的隐患）。注：原 empty/ 无头测试沙箱已不存在（85 用例物理文件已被清理），本次未跑脚本回归，靠迁移幂等+备份机制与用户界面验证兜底
+- 2026-09-22 删除番茄钟功能（用户："拿来没用"）：右下角小工具只剩记事本/日报——WIDGETS 去掉 pomo 条目、widgetActive 初值改 'notes'（旧 config 的 active_widget:'pomo' 不匹配 WIDGETS 自动落回默认，无需迁移）、POMO 对象/计时循环/配置弹窗/事件绑定/DOM/CSS 全删；今日概览条「专注」项与日报看板「专注」数同步移除（数据源只有番茄钟记录，删功能后必恒 0）；todayQuant 后端 _day_quant 的 pomo 字段恒 0 占位（reports 表 16 列结构与历史数据不动，年度聚合兼容）；report_ai_start 素材四去掉番茄钟行；load_config 去掉 pomo_focus/pomo_rest/pomo_log setdefault（config.json 里残留旧键无人再读，无害保留）。.pomo-btns/.pomo-go 两个类名保留（日报 widget 复用中，改名风险大于收益）；api.notify 保留（素材 OCR 完成提示在用）。注：本轮 shell（Git Bash）全程 ENOENT 不可用，无法跑机器语法检查/无头回归/重启/git add；验证改由子代理全文通读两文件完成（21 项标识符零残留、8 处缝合点结构完好、无 null 引用风险），重启与 git add 待环境恢复后补做
+- 2026-09-22 日历日报行一键复制：renderCalDetail 的 .cd-rep 行在「已有日报」时加「复制」按钮（id=cd-rep-copy，绑定留在函数内——该区每次点日期整块重绘 innerHTML）；复制口径与编辑页一致（REP.drafts 草稿优先于 report_get 归档），写剪贴板优先 navigator.clipboard.writeText（WebView2 下 file:// 属安全上下文），异常回落 execCommand('copy')+临时 textarea（须内联放开全局 user-select:none）；toast 反馈；无日报日不显示按钮
+- 2026-09-22 日历详情区日报行上移（用户定版"日报放到待办闭环上面"）：innerHTML 拼接顺序由「标题+待办+日报行」改为「标题+日报行+待办」；待办条目包 div.cd-items 承接原日报行的虚线分隔（border-top dashed + margin-top，无待办日不渲染容器避免孤线）；已核实 .cd-item/.cd-title 等全部为 .cal-detail 后代选择器，包层不破坏样式
+- 2026-10-08 右下角新增「学习」widget：集成 agent-study 学习系统（tutor 包，D:\dev\project\agent-study）——概览行（当前连续 / 累计不归零 / 到期复习卡）+ 今日计划一行（含恢复日/弹性日提示、卡片堆积警告）+ 一键打卡与保签（分钟输入框）+ 近 7 日出勤格子；数据经 Api.tutor_status/tutor_checkin 桥直接 import tutor 包取结构化数据（免 subprocess 文本解析编码坑）；WIDGETS 表新增 onshow 钩子（切到该 tab 时拉实时数据，机制通用化）；端到端验证通过（真实 WebView 窗口切 tab 渲染 + UI 级点击打卡全链路）
+- 2026-10-09 学习 widget 新增「学习内容」汇总 + 打卡备注：① 打卡行上方加可选一句话输入框（"今天学了什么"，随打卡写入 checkins.json 的 note，修掉 UI 恒传空串的浪费，打卡成功清空）；② 出勤格子下方新增近 7 天学习内容列表——内容主体来自 progress.md「学习记录」表（收尾协议保证每次会话更新，零额外负担），打卡备注兜底保签日留痕；每行 日期·时长·模式·首条内容一行截断，点击展开完整内容+产出，今日无记录显示"尚无学习记录"（不渲染愧疚文案）；③ 解析器落在 agent-study 新模块 tutor/studylog.py（按表头名定位列防列序漂移、兼容区间日期 2026-07-26~29、同日多行按序保留、脏行跳过不抛错），桥 Api.tutor_log(7) 失败返回空列表兜底不炸 widget；④ agent-study pytest 26/26（新增 9 用例）+ 真实 progress.md 冒烟（10-08 合并 4 条目 + 19min 保签），app.py py_compile 与 index.html node --check 通过。连带：.gitignore 补 data/reports_backup_*/（9-22 日报迁移整库备份差点被 add -A 带入，含 16 天业务数据）

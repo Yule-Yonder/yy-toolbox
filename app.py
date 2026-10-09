@@ -17,12 +17,14 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import sqlite3
 import subprocess
 import sys
 import threading
 import time
 from ctypes import wintypes
+from datetime import date
 from pathlib import Path
 
 import webview
@@ -233,8 +235,11 @@ def scan_external(cfg: dict) -> list:
 
 
 def all_tools(cfg: dict) -> list:
-    """全量工具 = 根目录扫描 + 外部目录扫描 + 自定义应用（launch 与 get_all 共用）。"""
-    return scan_tools() + scan_external(cfg) + scan_apps(cfg)
+    """全量工具 = 根目录扫描 + 外部目录扫描 + 自定义应用（launch 与 get_all 共用）。
+    hidden 名单统一过滤（2026-09-15 用户要求支持移除应用）：被隐藏的卡不进任何出口，
+    分组残留由 reconcile 自动清出（配置里有、扫描不到 → 清）。"""
+    hidden = set(cfg.get('hidden', []))
+    return [t for t in scan_tools() + scan_external(cfg) + scan_apps(cfg) if t['dir'] not in hidden]
 
 
 def scan_bgs() -> list:
@@ -339,13 +344,12 @@ def load_config() -> dict:
                 cfg.setdefault('todos', [])           # 待办事项 [{id, text, created_at}]
                 cfg.setdefault('todo_history', [])    # 闭环历史（前端维护，最近 20 条）
                 cfg.setdefault('active_group', None)  # 上次打开的分组（ Ungrouped 用 __ungrouped__）
-                cfg.setdefault('active_widget', None)  # 右下角上次使用的小工具（pomo/notes…）
+                cfg.setdefault('active_widget', None)  # 右下角上次使用的小工具（notes/report…）
                 cfg.setdefault('notes_pages', [''])    # 记事本多页内容（HTML 数组）
                 cfg.setdefault('notes_page', 0)        # 记事本当前页索引
-                cfg.setdefault('pomo_focus', 25)       # 番茄钟专注时长（分钟）
-                cfg.setdefault('pomo_rest', 5)         # 番茄钟休息时长（分钟）
                 cfg.setdefault('bg_enabled', True)    # 背景图开关（图放 web/bg/，多张随机）
                 cfg.setdefault('apps', [])            # 手动添加的本地应用 [{id,name,path}]
+                cfg.setdefault('hidden', [])          # 被隐藏的工具卡主键（根目录目录名 / ext:文件名），可恢复
                 cfg.setdefault('report_repos', [])     # 日报 git 仓库路径列表（本地扫描，无需 gitee 令牌）
                 cfg.setdefault('report_author', '')    # 提交作者过滤（空=自动取 git 全局 user.email）
                 cfg.setdefault('report_wechat_name', '')  # 本人微信昵称（聊天记录逐条带发送者名，AI 靠它区分谁在说话）
@@ -357,7 +361,7 @@ def load_config() -> dict:
         except (OSError, ValueError):
             pass  # 配置损坏则回退默认，不阻断启动
     return {'groups': [], 'ungrouped': [], 'external_dirs': [], 'todos': [],
-            'todo_history': [], 'active_group': None, 'bg_enabled': True, 'apps': []}
+            'todo_history': [], 'active_group': None, 'bg_enabled': True, 'apps': [], 'hidden': []}
 
 
 def save_config(cfg: dict) -> None:
@@ -468,23 +472,22 @@ def scan_repo_commits(repo: str, day: str, author: str) -> dict:
     return {'repo': name, 'commits': commits, 'err': None}
 
 
-# 日报体例（2026-09-07 用户定版）：四节结构，不要明日计划；全文 ≤150 字、目标 80 字左右
-# （用户实锤"日常生成过长了"）；开发内容与影响范围为王，严禁代码行数/文件数统计入正文
-REPORT_BODY_HINT = ("### 今日完成\n"
-                    "- 按项目/工作主题分组，每节至多 1-2 条、每条一句话：写清开发内容与影响范围"
-                    "（做了什么、解决什么问题、涉及哪些模块），标注已完成/进行中\n\n"
-                    "### 微信工作沟通要点\n"
-                    "- （来自微信素材的沟通、需求与协作要点；素材无微信内容则省略本节）\n\n"
-                    "### 其他事项\n"
-                    "- （领导临时安排、会议、面试/接待等零散工作；无则省略本节）\n\n"
-                    "### 问题与风险\n"
-                    "- （当前遇到的问题、阻塞项与风险；无则省略本节）")
+# 日报体例（2026-09-22 用户定版）：正文纯编号条目逐行罗列（1. 2. 3. …），严禁任何小节标题字样
+# ——旧四节结构「今日完成/微信工作沟通要点/其他事项/问题与风险」就此退役；
+# 全文 ≤150 字、目标 80 字左右（2026-09-07 用户定版）；开发内容与影响范围为王，
+# 严禁代码行数/文件数统计入正文
+REPORT_BODY_HINT = ("正文直接用编号条目逐行罗列（1. 2. 3. ……），严禁输出任何小节标题字样"
+                    "（「今日完成」「微信工作沟通要点」「其他事项」「问题与风险」「明日工作」等一律不写）：\n"
+                    "- 每条一句话：按工作主题聚类合并同类项，写清开发内容与影响范围"
+                    "（做了什么、解决什么问题、涉及哪些模块），标注已完成/进行中；"
+                    "微信沟通、领导临时安排、问题与风险等内容直接转为对应编号条目混排，不单独成节；"
+                    "素材中无对应内容的类别自然少几条")
 
 
 def build_report_prompt(day: str, commit_lines: str, wechat: str, ai_summary: str,
                         wechat_name: str = '') -> str:
-    """AI 日报草稿 prompt：体例四节（今日完成/微信沟通要点/其他事项/问题与风险），
-    不要明日计划、严禁代码量统计入正文（2026-09-04 用户定版）；
+    """AI 日报草稿 prompt：体例为纯编号条目罗列、严禁小节标题字样（2026-09-22 用户定版，
+    退役 2026-09-04 的四节结构），不要明日计划、严禁代码量统计入正文；
     全文 ≤150 字目标 80 字左右（2026-09-07 用户定版）。
     严禁编造素材外内容（日报要能对外交差，真实性优先）。
     表述要求主题聚类+研发视角扩写（素材已含改动规模/模块/提交说明）——
@@ -500,14 +503,14 @@ def build_report_prompt(day: str, commit_lines: str, wechat: str, ai_summary: st
     return (f'请根据下方素材，为「杨阳」撰写 {day} 的工作日报草稿。\n'
             '要求：\n'
             '- 只依据素材撰写，严禁编造素材中不存在的工作内容；语言简洁、专业\n'
-            '- 长度硬约束：正文总字数不超过 150 字，尽量 80 字左右；每节至多 1-2 条、每条一句话，'
+            '- 长度硬约束：正文总字数不超过 150 字，尽量 80 字左右；全文至多 6 条、每条一句话，'
             '短句直述，删掉一切修饰、铺垫与重复信息\n'
-            '- 「今日完成」按工作主题聚类：同主题的多次提交合并为一条，用研发视角表述'
+            '- 条目按工作主题聚类：同主题的多次提交合并为一条，用研发视角表述'
             '（做了什么、解决什么问题、影响哪些模块），体现工作含量；'
             '严禁逐条罗列提交标题或照抄提交原文——提交明细是素材，不是格式；'
             '严禁把「+N/-M 行」「N 个文件」等代码量统计写进正文（改动统计仅供你判断工作量）\n'
             f'{wx_rule}'
-            '- 用 Markdown 按以下四节结构输出（无内容的节省略；不要明日计划、不要一级标题、不要人名标题）：\n'
+            '- 用 Markdown 输出（不要一级标题、不要人名标题、不要明日计划）：\n'
             f'{REPORT_BODY_HINT}\n\n'
             f'## 素材一：git 提交明细（{day}，括号内为涉及模块）\n{commit_lines or "（无提交记录）"}\n\n'
             f'## 素材二：微信素材（聊天摘录粘贴 + 截图 OCR 识别文本，〔〕标记为单张截图）\n{wechat or "（无）"}\n\n'
@@ -714,6 +717,7 @@ def assemble_wechat_material(wechat: str, ocr_blocks: list) -> str:
 # ---- 日报 SQLite 权威存储（2026-09-04：年度述职数据源；md 文件保留为人工查看/外部流转副本）----
 # sqlite3 标准库零依赖，与纯离线原则一致。量化快照列（提交/行数/番茄/待办/token）在保存日报时落库，
 # 年度述职可直接 SELECT 聚合出全年报表；首次使用自动把 data/reports/*.md 旧档迁移入库（幂等）。
+# （番茄钟 2026-09-22 删除：pomo 两列保留占位、新快照恒 0，历史数据不动。）
 _DB_READY = {'path': None}
 
 
@@ -766,6 +770,74 @@ def _db():
         _DB_READY['path'] = str(path)
         return con
     return sqlite3.connect(str(path))
+
+
+# ---- 存量日报体例一次性迁移（2026-09-22 用户定版：正文禁节标题字样、条目改编号罗列）----
+# 闸门用 PRAGMA user_version（0=未迁移，1=已迁移），幂等可重入；执行前整库+md 副本
+# 自动备份到 data/reports_backup_<时间戳>/（assets 素材不入备份），备份失败即中止不落转换。
+_REPORT_STYLE_VER = 1
+# 已知节标题行（含 ### 前缀与可选 ** 包裹；「明日工作/明日计划」为 09-04 前旧档可能出现）
+_SECTION_TITLE = re.compile(
+    r'^#{1,6}\s*\*{0,2}(?:今日完成|微信工作沟通要点|微信工作重点|其他事项|问题与风险|明日工作|明日计划)\*{0,2}\s*$')
+_REPORT_LI = re.compile(r'^\s*[-*]\s+(.+?)\s*$')
+
+
+def restyle_report(text: str):
+    """单篇正文转换：删已知节标题行、'- ' 条目改递增编号，其余行原样保留。
+    返回 (新文本, 删除标题数)；已符合新体例的文本转换结果与原文恒等（幂等）。"""
+    out, dropped, n = [], 0, 0
+    for line in (text or '').splitlines():
+        if _SECTION_TITLE.match(line.strip()):
+            dropped += 1
+            continue
+        m = _REPORT_LI.match(line)
+        if m:
+            n += 1
+            out.append(f'{n}. {m.group(1)}')
+        else:
+            out.append(line.rstrip())
+    new = '\n'.join(out)
+    if new.strip():
+        new += '\n'
+    return new, dropped
+
+
+def migrate_report_style() -> str:
+    """启动时存量日报体例转换（权威库 reports.content 与 md 副本双写，summary 重算）。
+    已迁移过（user_version 达标）直接跳过；备份失败则中止，不碰任何数据。"""
+    con = _db()
+    if con.execute('PRAGMA user_version').fetchone()[0] >= _REPORT_STYLE_VER:
+        con.close()
+        return 'skip（此前已完成迁移）'
+    try:
+        bdir = APP_DIR / 'data' / f'reports_backup_{time.strftime("%Y%m%d_%H%M%S")}'
+        bdir.mkdir(parents=True, exist_ok=False)
+        if Path(DB_PATH).is_file():
+            shutil.copy2(DB_PATH, bdir / 'reports.db')
+        if REPORTS_DIR.is_dir():
+            shutil.copytree(REPORTS_DIR, bdir / 'reports',
+                            ignore=shutil.ignore_patterns('assets'))
+    except OSError as e:
+        con.close()
+        return f'backup fail: {e}（已中止，未转换任何数据）'
+    changed = same = 0
+    try:
+        for day, content in con.execute('SELECT day, content FROM reports ORDER BY day').fetchall():
+            new, _ = restyle_report(content)
+            if new == content:
+                same += 1
+                continue
+            con.execute('UPDATE reports SET content=?, summary=? WHERE day=?',
+                        (new, _report_summary(new), day))
+            p = REPORTS_DIR / f'{day}.md'
+            if p.is_file():
+                p.write_text(new, encoding='utf-8')
+            changed += 1
+        con.execute(f'PRAGMA user_version = {_REPORT_STYLE_VER}')   # PRAGMA 不支持参数绑定，常量拼接无注入面
+        con.commit()
+    finally:
+        con.close()
+    return f'已转换 {changed} 篇（{same} 篇本已符合新体例），备份于 {bdir.name}'
 
 
 # ============================== 全局热键 ==============================
@@ -1062,6 +1134,55 @@ class Api:
         except Exception:
             return False
 
+    def hide_tool(self, dirname: str) -> bool:
+        """隐藏工具卡（根目录自研工具 / 外部扫描 ext: 卡）：入 config.hidden、清分组归属。
+        与 remove_app 的区别：文件、TOOLS.md 登记均不动，可从顶部「隐藏项」随时恢复；
+        app:{id} 自定义卡不走此路径（有彻底移除的 remove_app）。"""
+        try:
+            if not dirname or dirname.startswith('app:'):
+                return False
+            cfg = load_config()
+            if dirname not in cfg.setdefault('hidden', []):
+                cfg['hidden'].append(dirname)
+            for g in cfg['groups']:
+                g['tools'] = [d for d in g['tools'] if d != dirname]
+            cfg['ungrouped'] = [d for d in cfg['ungrouped'] if d != dirname]
+            save_config(cfg)
+            return True
+        except Exception:
+            return False
+
+    def unhide_tool(self, dirname: str) -> bool:
+        """恢复隐藏的工具卡：出 hidden 名单；下次 get_all 时 reconcile 把它放回「未分组」。"""
+        try:
+            cfg = load_config()
+            cfg['hidden'] = [d for d in cfg.get('hidden', []) if d != dirname]
+            save_config(cfg)
+            return True
+        except Exception:
+            return False
+
+    def hidden_tools(self) -> list:
+        """被隐藏工具的可读列表 [{dir,name,desc}]，供恢复弹窗展示。
+        自愈：目录/文件已不存在的条目直接清出 hidden（恢复无意义，残留只会越积越多）。"""
+        cfg = load_config()
+        meta = parse_tools_md()
+        out, alive = [], []
+        for d in cfg.get('hidden', []):
+            if d.startswith('ext:'):
+                name, desc = d[4:], '外部工具'
+            elif not d.startswith(('app:', 'ext:')) and (ROOT / d).is_dir():
+                m = meta.get(d) or {}
+                name, desc = m.get('name') or d, m.get('desc', '')
+            else:
+                continue                        # 已失效条目：不展示且顺手清出
+            out.append({'dir': d, 'name': name, 'desc': desc})
+            alive.append(d)
+        if len(alive) != len(cfg.get('hidden', [])):
+            cfg['hidden'] = alive
+            save_config(cfg)
+        return out
+
     @staticmethod
     def _launch_python(app_py: str):
         """无 bat/exe 的兜底：优先用该工具自身 .venv 的 pythonw 无窗启动。"""
@@ -1137,7 +1258,7 @@ class Api:
         """异步启动 AI 生成（流式）。js_api 是"调用-返回"模型，无法把流式进度塞进
         单次返回值——故起后台线程跑流式请求，前端轮询 report_ai_poll 拉思考/正文增量。
         scan_json = report_scan_commits 结果原样回传（前端已剔除不想写进日报的提交）。
-        quant_json = 前端采集的本机量化数据（番茄钟/待办），拼素材四帮 AI 体现实工作量。
+        quant_json = 前端采集的本机量化数据（待办），拼素材四帮 AI 体现实工作量。
         assets_json = 当日截屏素材文件名列表（兼容传 {name,...} 对象数组）。后端自读同名 .txt 的
         OCR 文本入 prompt；无 OCR 文本的图转 base64 走视觉兜底（取最近 20 张，视觉封顶 5 张防爆量）。"""
         cfg = load_config()
@@ -1167,8 +1288,6 @@ class Api:
         if gs.get('commits'):
             # 不报行数——行数统计被用户明确移出日报正文，素材里也不喂汇总行数
             quant_lines.append(f"- git：当日 {gs['commits']} 次提交，活跃 {gs['repos']} 个仓库")
-        if q.get('pomo_min'):
-            quant_lines.append(f"- 番茄钟：当日专注 {q['pomo_min']} 分钟（{q.get('pomo_sessions', '?')} 段）")
         if q.get('todo_created') or q.get('todo_closed'):
             quant_lines.append(f"- 待办：新建 {q.get('todo_created', 0)} 项、闭环 {q.get('todo_closed', 0)} 项")
         quant_block = ('\n\n## 素材四：本机工作量化数据（体现实工作量，可在草稿中自然引用，严禁夸大）\n'
@@ -1266,12 +1385,71 @@ class Api:
         except OSError as e:
             return {'exists': False, 'text': '', 'updated': '', 'err': str(e)}
 
+    # ---- 学习打卡（agent-study 项目 tutor 包：右下角「学习」widget 数据源，2026-10-08）----
+    # tutor 是纯标准库包（3.10+ 语法），直接 sys.path 导入拿结构化数据，
+    # 免 subprocess 跑 CLI 再解析文本（中文输出有 GBK/UTF-8 双层转码坑）。
+    _TUTOR_ROOT = r'D:\dev\project\agent-study'
+
+    def _tutor_mods(self):
+        if self._TUTOR_ROOT not in sys.path:
+            sys.path.insert(0, self._TUTOR_ROOT)
+        from tutor import checkin, report, session, srs, studylog
+        return checkin, report, session, srs, studylog
+
+    def tutor_status(self) -> dict:
+        """学习概览：阶段/连续/累计/到期卡/今日计划性质 + 近 7 日出勤格子。"""
+        try:
+            checkin, report, session, srs, _ = self._tutor_mods()
+            stats = checkin.compute_stats()
+            summary = srs.summarize()
+            plan = session.build_plan(summary=summary)
+            weekly = report.build_report()
+            return {
+                'ok': True,
+                'done_today': date.today().isoformat() in checkin.load_checkins(),
+                'current_streak': stats.current,
+                'total_days': stats.total_days,
+                'hours': stats.hours,
+                'due': summary.due, 'fresh': summary.fresh, 'total_cards': summary.total,
+                'kind': plan.kind, 'headline': plan.headline,
+                'warnings': plan.warnings,
+                # 近 7 日（旧→今）：state ∈ full / minimal / miss
+                'week': [{'d': r.day.strftime('%m-%d'), 's': r.state} for r in weekly.days],
+            }
+        except Exception as e:
+            return {'ok': False, 'err': str(e)}
+
+    def tutor_checkin(self, minutes: int, mode: str = 'full', note: str = '') -> dict:
+        """一键打卡/保签：写 agent-study 的 tutor/data/checkins.json 并返回最新连续统计。"""
+        try:
+            checkin, _, _, _, _ = self._tutor_mods()
+            checkin.record_checkin(date.today(), int(minutes), mode, (note or '')[:200])
+            stats = checkin.compute_stats()
+            return {'ok': True, 'current_streak': stats.current,
+                    'total_days': stats.total_days, 'hours': stats.hours}
+        except Exception as e:
+            return {'ok': False, 'err': str(e)}
+
+    def tutor_log(self, days: int = 7) -> dict:
+        """近 N 天学习内容日志：progress.md「学习记录」表为主体 + 打卡备注兜底，按日合并。"""
+        try:
+            _, _, _, _, studylog = self._tutor_mods()
+            logs = studylog.recent(int(days))
+            return {
+                'ok': True, 'today': date.today().isoformat(),
+                'log': [{'day': d.day, 'minutes': d.minutes, 'mode': d.mode, 'note': d.note,
+                         'items': [{'content': i.content, 'output': i.output} for i in d.items]}
+                        for d in logs],
+            }
+        except Exception as e:
+            return {'ok': False, 'log': [], 'err': str(e)}
+
     def _day_quant(self, day: str) -> dict:
-        """按日量化（番茄钟/待办），口径与前端 todayQuant() 一致；保存日报时快照入库。"""
+        """按日量化（待办），口径与前端 todayQuant() 一致；保存日报时快照入库。
+        pomo 两字段恒 0（番茄钟功能 2026-09-22 删除），保留占位维持 reports 表 16 列结构。"""
         cfg = load_config()
-        pm = [x for x in cfg.get('pomo_log', []) if x.get('date') == day]
-        return {'pomo_min': sum(x.get('focus_min', 0) or 0 for x in pm),
-                'pomo_sessions': len(pm),
+        return {'pomo_min': 0,
+                'pomo_sessions': 0,
                 'todo_created': sum(1 for t in cfg.get('todos', [])
                                     if (t.get('created_at') or '').startswith(day)),
                 'todo_closed': sum(1 for t in cfg.get('todo_history', [])
@@ -1584,7 +1762,7 @@ class Api:
         self._hide_win()
 
     def notify(self, title: str, msg: str) -> bool:
-        """Windows 原生 toast 通知（PowerShell + WinRT，番茄钟到点用）。
+        """Windows 原生 toast 通知（PowerShell + WinRT；素材 OCR 完成提示等）。
         脚本按 utf-8-sig 落盘规避编码坑；失败回落蜂鸣提示。"""
         ps = ("param([string]$Title = '', [string]$Msg = '')\n"
               "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications,"
@@ -1709,6 +1887,10 @@ def main():
         return
 
     api = Api()
+    try:
+        api._dbg(f'report style migrate: {migrate_report_style()}')   # 存量日报体例迁移（幂等，见 _REPORT_STYLE_VER）
+    except Exception as e:                     # 迁移属非关键路径：失败记日志，不阻断面板启动
+        api._dbg(f'report style migrate error: {e}')
     window = webview.create_window(
         'YY工具箱',
         url=str(WEB_PAGE),

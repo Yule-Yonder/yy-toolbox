@@ -325,7 +325,7 @@
   #todo-input::placeholder { color: var(--text-3); }
   .todo-empty { color: var(--text-3); font-size: 12px; padding: 10px 6px; }
 
-  /* ========== 右侧小工具区（tab 可切换，番茄钟为首个） ========== */
+  /* ========== 右侧小工具区（tab 可切换） ========== */
   #widget-panel {
     flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0;
     padding: 6px 12px 10px;
@@ -351,24 +351,8 @@
   .widget.show { display: flex; }
   #w-notes { align-items: stretch; }   /* 记事本编辑区拉伸全宽（center 会让宽度随内容伸缩） */
 
-  /* ---- 番茄钟 ---- */
-  .pomo-ring { position: relative; flex: 1; display: grid; place-items: center; min-height: 0; padding: 4px 0; }
-  .pomo-ring svg { max-height: 100%; }
-  .ring-bg { stroke: var(--divider); }
-  .ring-fg { stroke: var(--accent); transition: stroke-dashoffset 0.6s linear, stroke 300ms var(--ease-hover); }
-  .pomo-ring.break .ring-fg { stroke: #10B981; }
-  .pomo-ring.done .ring-fg { animation: pomo-pulse 1.2s var(--ease-hover) infinite; }
-  @keyframes pomo-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
-  .pomo-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
-  .pomo-time { font-size: 30px; font-weight: 600; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
-  .pomo-state { font-size: 12px; color: var(--text-3); }
+  /* .pomo-btns / .pomo-go 原为番茄钟样式，现仅日报 widget 复用 */
   .pomo-btns { display: flex; align-items: center; gap: 8px; width: 100%; padding-top: 6px; }
-  .pomo-chip {
-    border: 1px solid var(--card-border); background: transparent; color: var(--text-2);
-    border-radius: 999px; padding: 4px 12px; font-size: 12px; font-family: inherit; cursor: pointer;
-    transition: border-color 150ms var(--ease-hover), color 150ms var(--ease-hover), background-color 150ms var(--ease-hover);
-  }
-  .pomo-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-subtle); }
   .pomo-go {
     border: none; background: var(--accent); color: var(--on-accent); font-weight: 600;
     border-radius: 999px; padding: 5px 18px; font-size: 13px; font-family: inherit; cursor: pointer;
@@ -376,14 +360,6 @@
   }
   .pomo-go:hover { filter: brightness(1.08); }
   .pomo-go:active { transform: scale(0.97); }
-  .pomo-cfg-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-  .pomo-cfg-row label { font-size: 13px; color: var(--text-2); flex: 1; }
-  #modal .pomo-cfg-row input {
-    width: 90px; padding: 6px 10px; border: 1px solid var(--card-border); border-radius: var(--radius-sm);
-    font-size: 13px; outline: none; font-family: inherit; color: var(--text-1); background: var(--card-bg);
-    transition: border-color 150ms var(--ease-hover), box-shadow 150ms var(--ease-hover);
-  }
-  #modal .pomo-cfg-row input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 
   /* ---- 记事本（富文本） ---- */
   .notes-toolbar {
@@ -522,6 +498,7 @@
   .rw-preview p { margin: 4px 0; }
   .rw-preview ul { margin: 4px 0; padding-left: 18px; }
   .rw-preview li { margin: 2px 0; }
+  .rw-preview .md-oli { margin: 2px 0; }
   .rw-preview code { font-family: Consolas, monospace; font-size: 11.5px; background: var(--subtle-hover); border-radius: 4px; padding: 1px 5px; }
   .rw-live {
     position: absolute; inset: 0; display: none; flex-direction: column; gap: 8px;
@@ -576,6 +553,38 @@
   .rw-board-row .rb-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
   .rw-board-row .rb-sep { color: var(--text-3); }
   .rw-recent { flex: 1; min-height: 0; overflow-y: auto; border-top: 1px solid var(--divider); padding-top: 4px; }
+  /* 学习 widget（agent-study tutor） */
+  .tw-plan { font-size: 12px; color: var(--text-2); line-height: 1.55; padding: 5px 2px 0; }
+  #tw-min {
+    width: 60px; padding: 5px 8px; border: 1px solid var(--card-border); border-radius: var(--radius-md);
+    font-size: 12px; font-family: inherit; color: var(--text-1); background: var(--card-bg); outline: none;
+  }
+  #tw-min:focus { border-color: var(--accent); }
+  .tw-week { display: flex; gap: 5px; padding: 6px 2px 2px; }
+  .tw-d { flex: 1; height: 13px; border-radius: 4px; background: var(--subtle-hover); }
+  .tw-d.full { background: var(--accent); }
+  .tw-d.minimal { background: var(--accent); opacity: .5; }
+  #tw-note {
+    width: 100%; box-sizing: border-box; margin-top: 7px; padding: 5px 8px;
+    border: 1px solid var(--card-border); border-radius: var(--radius-md);
+    font-size: 12px; font-family: inherit; color: var(--text-1); background: var(--card-bg); outline: none;
+  }
+  #tw-note:focus { border-color: var(--accent); }
+  .tw-log { max-height: 150px; overflow-y: auto; border-top: 1px solid var(--divider); margin-top: 6px; padding-top: 4px; }
+  .tw-log .tl {
+    display: flex; align-items: baseline; gap: 7px; font-size: 11.5px; color: var(--text-2);
+    padding: 3px 4px; border-radius: 6px; cursor: pointer;
+    transition: background-color 150ms var(--ease-hover), color 150ms var(--ease-hover);
+  }
+  .tw-log .tl:hover { background: var(--subtle-hover); color: var(--accent); }
+  .tw-log .tl .d { flex: none; color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tw-log .tl .s { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tw-log .tl .arr { flex: none; color: var(--text-3); font-size: 10px; }
+  .tw-log .tl-detail { font-size: 11.5px; color: var(--text-2); line-height: 1.6; padding: 2px 4px 7px 26px; overflow-wrap: anywhere; }
+  .tw-log .tl-detail .o { color: var(--text-3); }
+  .tw-log .tl.tl-muted { cursor: default; }
+  .tw-log .tl.tl-muted:hover { background: none; color: var(--text-3); }
+  .tw-log .tl-empty { font-size: 11px; color: var(--text-3); text-align: center; padding: 8px 0; }
   .rw-recent .rr {
     display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--text-2);
     padding: 3px 4px; cursor: pointer; border-radius: 6px;
@@ -625,6 +634,8 @@
   /* 日历"有日报"角标：日期格子底部居中小蓝点（右上数字徽标仍是待办，两者可并存） */
   .cal-cell .rep-dot { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
   .cal-detail .cd-rep { display: flex; align-items: center; gap: 8px; padding: 6px 2px; font-size: 12px; color: var(--text-2); border-top: 1px dashed var(--divider); margin-top: 6px; }
+  /* 日报行上移后，待办明细包此容器承接与日报行之间的虚线分隔（无待办日不渲染容器，避免多一条孤线） */
+  .cal-detail .cd-items { border-top: 1px dashed var(--divider); margin-top: 6px; }
 
   /* ========== 模态（Acrylic：遮罩+弹窗双层 backdrop-filter；必须直挂 body，防 backdrop root 截断） ========== */
   #modal-mask {
@@ -658,6 +669,13 @@
   }
   #modal input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
   #modal .err { color: var(--danger); font-size: 12px; height: 16px; margin: 6px 0 4px; }
+  /* 隐藏项管理列表（右键「从工具箱隐藏」后的恢复入口） */
+  #modal .hid-list { max-height: 320px; overflow-y: auto; margin: 0 -6px; }
+  #modal .hid-item { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-bottom: 1px solid var(--card-border); }
+  #modal .hid-item:last-child { border-bottom: none; }
+  #modal .hid-item .hi-body { flex: 1; min-width: 0; }
+  #modal .hid-item .hi-name { font-size: 13px; font-weight: 600; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #modal .hid-item .hi-desc { font-size: 12px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #modal .btns { display: flex; justify-content: flex-end; gap: 8px; }
   #modal button {
     padding: 6px 16px; border-radius: var(--radius-sm); border: 1px solid var(--card-border);
@@ -717,15 +735,15 @@
   <div class="logo-hint">Alt+Space 唤起 / 隐藏 · 点卡片启动 · 拖卡片分组</div>
   <div class="spacer"></div>
   <button class="ghost" id="btn-bg" title="显示 / 隐藏背景图">背景</button>
+  <button class="ghost" id="btn-hidden" title="查看 / 恢复已隐藏的工具">隐藏项</button>
   <button class="ghost" id="btn-refresh">刷新</button>
   <button class="ghost danger" id="btn-quit">退出</button>
 </header>
 
-<!-- ★ 今日工作概览条：极薄一行扫一眼今日工作量；数字即入口（提交→向导 / 专注→番茄钟 / 日报→今日日报 / AI→设置） -->
+<!-- ★ 今日工作概览条：极薄一行扫一眼今日工作量；数字即入口（提交→向导 / 日报→今日日报 / AI→设置） -->
 <div id="today-bar">
   <button class="tb-item" id="tb-commit" title="今日 git 提交 · 点击按项目查看提交明细">提交 –</button><span class="tb-sep">·</span>
   <button class="tb-item" id="tb-todo" title="今日待办 闭环/新建 · 点击看历史待办">闭环 –</button><span class="tb-sep">·</span>
-  <button class="tb-item" id="tb-pomo" title="今日番茄钟专注分钟 · 点击切换到番茄钟">专注 –</button><span class="tb-sep">·</span>
   <button class="tb-item" id="tb-report" title="点击查看 / 编辑今日日报">日报 –</button><span class="tb-sep">·</span>
   <button class="tb-item" id="tb-ai" title="今日 AI token 用量 · 点击打开日报设置">AI –</button>
 </div>
@@ -749,32 +767,10 @@
     </div>
   </section>
 
-  <!-- 右侧小工具区：顶部胶囊 tab 可切换（番茄钟为首个，后续可扩展） -->
+  <!-- 右侧小工具区：顶部胶囊 tab 可切换（后续可扩展） -->
   <section id="widget-panel">
     <div id="widget-tabs"></div>
     <div id="widget-body">
-      <!-- 番茄钟 -->
-      <div class="widget" id="w-pomo">
-        <div class="pomo-ring">
-          <svg viewBox="0 0 120 120" width="132" height="132">
-            <circle class="ring-bg" cx="60" cy="60" r="52" fill="none" stroke-width="8"/>
-            <circle class="ring-fg" id="pomo-ring" cx="60" cy="60" r="52" fill="none" stroke-width="8"
-                    stroke-linecap="round" transform="rotate(-90 60 60)"/>
-          </svg>
-          <div class="pomo-center">
-            <div class="pomo-time" id="pomo-time">25:00</div>
-            <div class="pomo-state" id="pomo-state">准备专注</div>
-          </div>
-        </div>
-        <div class="pomo-btns">
-          <button id="pomo-mode" class="pomo-chip" title="点击切换 专注↔休息">🍅 专注 25′</button>
-          <span style="flex:1"></span>
-          <button id="pomo-cfg" class="mini-btn" title="配置时长">⚙</button>
-          <button id="pomo-reset" class="mini-btn">重置</button>
-          <button id="pomo-toggle" class="pomo-go">开始</button>
-        </div>
-      </div>
-
       <!-- 记事本：简单富文本（加粗/斜体/删除线/字号/清除格式），内容自动持久化 -->
       <div class="widget" id="w-notes">
         <div class="notes-toolbar">
@@ -798,11 +794,10 @@
           <button id="np-del" class="nt-btn" title="删除当前页">✕</button>
         </div>
       </div>
-      <!-- ★ 日报：今日看板（git/专注/日报状态）+ 生成入口 + 最近日报流（点任意一天直达查看/编辑） -->
+      <!-- ★ 日报：今日看板（git/日报状态）+ 生成入口 + 最近日报流（点任意一天直达查看/编辑） -->
       <div class="widget" id="w-report">
         <div class="rw-board-row">
           <span id="rw-b-git" class="rb-num" style="cursor:pointer" title="点击按项目查看今日提交明细">提交 –</span><span class="rb-sep">·</span>
-          <span id="rw-b-pomo" class="rb-num">专注 –</span><span class="rb-sep">·</span>
           <span id="rw-b-state" class="rb-num">日报 –</span>
         </div>
         <div class="pomo-btns" style="margin:8px 0">
@@ -811,6 +806,24 @@
           <button id="rw-edit" class="mini-btn" title="查看或编辑今日已归档日报">查看今日</button>
         </div>
         <div id="rw-recent" class="rw-recent"></div>
+      </div>
+      <!-- ★ 学习：agent-study 学习系统概览（连续/累计/到期卡）+ 一键打卡/保签 -->
+      <div class="widget" id="w-tutor">
+        <div class="rw-board-row">
+          <span id="tw-streak" class="rb-num" title="当前连续天数（断签只清这个）">连续 –</span><span class="rb-sep">·</span>
+          <span id="tw-total" class="rb-num" title="历史累计出勤天数与小时（永不归零）">累计 –</span><span class="rb-sep">·</span>
+          <span id="tw-due" class="rb-num" title="Obsidian 到期复习卡（点开 Obsidian 刷卡）">到期 –</span>
+        </div>
+        <div id="tw-plan" class="tw-plan">加载中…</div>
+        <input id="tw-note" type="text" maxlength="200" placeholder="今天学了什么（可空，随打卡记录）" title="一句话学习内容，展示在下方「学习内容」里">
+        <div class="pomo-btns" style="margin:8px 0 6px">
+          <input id="tw-min" type="number" min="1" max="600" value="110" title="学习时长（分钟）">
+          <button id="tw-full" class="pomo-go">打卡</button>
+          <span style="flex:1"></span>
+          <button id="tw-minimal" class="mini-btn" title="≥15 分钟最低承诺，保住连续记录">保签</button>
+        </div>
+        <div id="tw-week" class="tw-week"></div>
+        <div id="tw-log" class="tw-log" title="近 7 天学习内容（progress.md 学习记录表 + 打卡备注）"></div>
       </div>
     </div>
   </section>
@@ -876,19 +889,12 @@ async function loadData() {
   // 恢复上次打开的分组；该组已被删则回退未分组
   if (CFG.active_group) active = CFG.active_group;
   if (active !== UNG && !CFG.groups.some(g => g.name === active)) active = UNG;
-  // 恢复上次使用的右下角小工具（番茄钟/记事本…；已下线的工具回退番茄钟）
+  // 恢复上次使用的右下角小工具（记事本…；已下线的工具保持默认值不恢复）
   if (CFG.active_widget && WIDGETS.some(w => w.id === CFG.active_widget)) widgetActive = CFG.active_widget;
-  // 恢复番茄钟自定义时长（仅首次：后续唤起不再重置，否则暂停中的剩余时间会被清回满时长）
-  if (!pomoCfgLoaded) {
-    pomoCfgLoaded = true;
-    if (CFG.pomo_focus >= 1) POMO.focus = CFG.pomo_focus;
-    if (CFG.pomo_rest >= 1) POMO.rest = CFG.pomo_rest;
-    POMO.total = pomoLen(); POMO.remain = POMO.total;
-    pomoRender();
-  }
   renderWidgetTabs();
   renderTabs(); renderGrid(); renderTodos();
   refreshReportState();   // 日报 widget 状态行（异步不阻塞主渲染）
+  if (widgetActive === 'tutor') tutorRefresh();   // 学习 widget：上次停在它时随主刷新拉新
 }
 
 /** 应用背景：bg_enabled 且 web/bg/ 有图 → 随机取一张铺底 + 主题遮罩；否则回落纯 Mica */
@@ -1108,10 +1114,12 @@ document.addEventListener('contextmenu', e => {
     menu.style.top  = Math.min(e.clientY, innerHeight - 90) + 'px';
   } else if (card) {
     const t = toolOf(card.dataset.dir);
-    if (t && (t.type === 'app' || t.type === 'dir')) {   // 自定义应用/目录卡支持移除（根目录工具删文件夹即可）
+    if (t) {   // 全卡片右键：app: 自定义卡走彻底移除；根目录工具 / ext: 外部卡走隐藏（文件不动，可恢复）
       e.preventDefault();
       ctxTarget = card.dataset.dir;
-      menu.innerHTML = `<div class="danger" data-act="remove-app">移除应用</div>`;
+      menu.innerHTML = ctxTarget.startsWith('app:')
+        ? `<div class="danger" data-act="remove-app">移除应用</div>`
+        : `<div class="danger" data-act="hide-tool">从工具箱隐藏</div>`;
       menu.style.display = 'block';
       menu.style.left = Math.min(e.clientX, innerWidth - 140) + 'px';
       menu.style.top  = Math.min(e.clientY, innerHeight - 60) + 'px';
@@ -1134,6 +1142,14 @@ document.addEventListener('click', e => {
       if (!yes) return;
       if (await api.remove_app(dir)) loadData().catch(() => {});
       else toast('⚠️ 移除失败');
+    });
+  }
+  if (item.dataset.act === 'hide-tool') {
+    const dir = ctxTarget;
+    showConfirm('从工具箱隐藏', '入口将从面板移除；文件与 TOOLS.md 登记不受影响，可随时在顶部「隐藏项」中恢复。').then(async yes => {
+      if (!yes) return;
+      if (await api.hide_tool(dir)) loadData().catch(() => {});
+      else toast('⚠️ 隐藏失败');
     });
   }
   ctxTarget = null;
@@ -1224,6 +1240,29 @@ document.addEventListener('drop', e => {
 
 /* ---- 顶栏按钮 / 失焦隐藏 ---- */
 $('#btn-refresh').addEventListener('click', () => loadData().catch(() => toast('刷新失败')));
+
+/* ---- 隐藏项管理：列出被隐藏的工具卡，逐条恢复 ---- */
+$('#btn-hidden').addEventListener('click', async () => {
+  const list = await api.hidden_tools();
+  if (!list.length) return toast('没有隐藏的工具');
+  const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const mask = $('#modal-mask'), m = $('#modal');
+  m.innerHTML = `<h3>已隐藏的工具</h3>
+    <div class="hid-list">${list.map(x => `
+      <div class="hid-item">
+        <div class="hi-body"><div class="hi-name">${esc(x.name)}</div><div class="hi-desc">${esc(x.desc)}</div></div>
+        <button class="mini-btn" data-dir="${esc(x.dir)}">恢复</button>
+      </div>`).join('')}</div>
+    <div class="btns"><button id="m-cancel">关闭</button></div>`;
+  mask.classList.add('show');
+  m.querySelectorAll('.hid-item button').forEach(b => b.addEventListener('click', async () => {
+    if (!(await api.unhide_tool(b.dataset.dir))) return toast('⚠️ 恢复失败');
+    loadData().catch(() => {});
+    b.closest('.hid-item').remove();
+    if (!m.querySelector('.hid-item')) closeModal();   // 最后一条恢复完自动收起
+  }));
+  $('#m-cancel').addEventListener('click', closeModal);
+});
 $('#btn-quit').addEventListener('click', () => api.quit_app());
 window.addEventListener('blur', () => { if (!suppressHide && api) api.hide_panel(true); });
 $('#btn-bg').addEventListener('click', () => {
@@ -1393,14 +1432,37 @@ function renderCalDetail(k, map) {
   ];
   const hasRep = REP.dates.has(k);
   const repRow = `<div class="cd-rep"><span>📝 ${hasRep ? '已有日报' : '无日报'}</span><span style="flex:1"></span>
+      ${hasRep ? '<button class="mini-btn" id="cd-rep-copy" title="复制日报全文到剪贴板">复制</button>' : ''}
       <button class="mini-btn" id="cd-rep-open">${hasRep ? '查看 / 编辑' : '生成该日日报'}</button></div>`;
-  box.innerHTML = `<div class="cd-title">${d.getMonth() + 1} 月 ${d.getDate()} 日 · ${rows.length ? `${e.open.length} 进行 / ${e.closed.length} 闭环` : '无待办记录'}</div>${rows.join('')}${repRow}`;
+  // 日报行紧贴标题（用户 2026-09-22 定版：日报在待办闭环上面）；待办条目有内容才包容器承接虚线分隔
+  const rowsHtml = rows.length ? `<div class="cd-items">${rows.join('')}</div>` : '';
+  box.innerHTML = `<div class="cd-title">${d.getMonth() + 1} 月 ${d.getDate()} 日 · ${rows.length ? `${e.open.length} 进行 / ${e.closed.length} 闭环` : '无待办记录'}</div>${repRow}${rowsHtml}`;
   const items = box.querySelectorAll('.cd-item');
   const all = [...e.open, ...e.closed];
   items.forEach((el, i) => { el.querySelector('.tx').textContent = all[i].text; });   // textContent 防注入
   $('#cd-rep-open').addEventListener('click', () => {
     closeModal();
     setTimeout(() => openReport(k), 170);   // 等 150ms 出场动画结束再开向导（共用 #modal）
+  });
+  const cp = $('#cd-rep-copy');
+  if (cp) cp.addEventListener('click', async () => {
+    // 与编辑页同口径：未保存草稿优先于归档（用户复制的就是打开编辑页看到的那份）
+    const draft = REP.drafts[k];
+    const r = draft !== undefined ? { text: draft } : await api.report_get(k).catch(() => null);
+    const text = (r && r.text) || '';
+    if (!text.trim()) return toast('⚠️ 该日日报内容为空');
+    try {
+      await navigator.clipboard.writeText(text);   // WebView2 下 file:// 属安全上下文
+    } catch (e) {
+      const ta = document.createElement('textarea');   // 兜底：临时节点（须放开全局 user-select:none）
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;top:-999px;user-select:text';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+    toast('日报全文已复制 ✓');
   });
 }
 $('#todo-input').addEventListener('keydown', ev => {
@@ -1416,14 +1478,12 @@ const REP = { day: dayKey(new Date()), step: 1, scan: [], wechat: '', aiSum: '',
               drafts: {} };   // 按日未保存草稿缓存（实锤 2026-09-08：设置返回/弹窗重开丢编辑文本）
 const RW_STEPS = ['提交', '微信', '其他事项', '草稿'];
 
-/* ---- 今日量化数据（待办/番茄钟前端自有数据；git 走后端缓存接口） ---- */
+/* ---- 今日量化数据（待办前端自有数据；git 走后端缓存接口） ---- */
 function todayQuant() {
   const tk = dayKey(new Date());
   const tc = (CFG.todos || []).filter(t => (t.created_at || '').startsWith(tk)).length;
   const td = (CFG.todo_history || []).filter(t => (t.closed_at || '').startsWith(tk)).length;
-  const pm = (CFG.pomo_log || []).filter(x => x.date === tk);
-  return { todo_created: tc, todo_closed: td,
-           pomo_min: pm.reduce((s, x) => s + (x.focus_min || 0), 0), pomo_sessions: pm.length };
+  return { todo_created: tc, todo_closed: td, pomo_min: 0, pomo_sessions: 0 };
 }
 
 let tbGit = null;   // 今日 git 统计（顶部条与看板共用，一次拉取）
@@ -1433,10 +1493,7 @@ async function refreshReportState() {
   try { REP.dates = new Set(await api.report_dates()); } catch (e) { return; }
   const q = todayQuant();
   const todoTxt = `闭环 ${q.todo_closed}/${q.todo_created + q.todo_closed}`;
-  const pomoTxt = `专注 ${q.pomo_min}′`;
   $('#tb-todo').textContent = todoTxt;
-  $('#tb-pomo').textContent = pomoTxt;
-  $('#rw-b-pomo').textContent = pomoTxt;
   const tk = dayKey(new Date());
   const r = await api.report_get(tk).catch(() => null);
   const exists = !!(r && r.exists);
@@ -1481,9 +1538,6 @@ async function renderRecentReports() {
 
 $('#tb-commit').addEventListener('click', () => showCommitsView());
 $('#tb-todo').addEventListener('click', () => showTodayClosed());
-$('#tb-pomo').addEventListener('click', () => {
-  widgetActive = 'pomo'; CFG.active_widget = 'pomo'; persist(); renderWidgetTabs();
-});
 $('#tb-report').addEventListener('click', () => openReport(dayKey(new Date())));
 $('#tb-ai').addEventListener('click', () => showReportSettings());
 $('#rw-b-git').addEventListener('click', () => showCommitsView());   // 看板数字与顶部条同行为
@@ -1788,7 +1842,7 @@ function repSetMode(mode) {
 }
 
 /* ---- 轻量 Markdown → HTML（内置零依赖，工具要求纯离线不引 CDN）。
-   覆盖日报体例子集：# 标题 / - 列表 / **加粗** / `行内码` / 段落与换行；
+   覆盖日报体例子集：编号条目（2026-09-22 体例）/ # 标题 / - 列表 / **加粗** / `行内码` / 段落与换行；
    其余语法原样透传为纯文本（日报用不到，不追求完整规范） ---- */
 function mdToHtml(src) {
   const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1802,8 +1856,10 @@ function mdToHtml(src) {
     const l = raw.trimEnd();
     const h = l.match(/^(#{1,6})\s+(.*)$/);
     const li = l.match(/^\s*[-*]\s+(.*)$/);
+    const ol = l.match(/^\s*(\d{1,2}(?:\. |、|\))\s*)(.+)$/);   // 编号条目：1. / 1、/ 1)，点后须空格防误吞"3.5 天"类行
     if (h) { flushP(); closeUl(); const lv = Math.min(6, h[1].length + 2); html += `<h${lv}>${inline(h[2])}</h${lv}>`; }
     else if (li) { flushP(); if (!inUl) { html += '<ul>'; inUl = true; } html += `<li>${inline(li[1])}</li>`; }
+    else if (ol) { flushP(); closeUl(); html += `<div class="md-oli">${inline(ol[1] + ol[2])}</div>`; }
     else if (!l.trim()) { flushP(); closeUl(); }
     else { closeUl(); para.push(l.trim()); }
   });
@@ -2142,15 +2198,105 @@ async function openReport(day) {
 $('#rw-open').addEventListener('click', () => openReport());
 $('#rw-edit').addEventListener('click', () => openReport(dayKey(new Date())));
 
+/* ========== 学习 widget（agent-study tutor：概览 + 一键打卡/保签） ========== */
 
-/* ========== 右侧小工具区：tab 切换机制（番茄钟为首个，后续追加 WIDGETS 即可） ========== */
+async function tutorRefresh() {
+  const s = await api.tutor_status().catch(() => null);
+  if (!s || !s.ok) {
+    $('#tw-plan').textContent = s && s.err
+      ? `tutor 不可用：${s.err}` : 'tutor 不可用（D:\\dev\\project\\agent-study 未就绪？）';
+    return;
+  }
+  $('#tw-streak').textContent = `连续 ${s.current_streak} 天`;
+  $('#tw-total').textContent = `累计 ${s.total_days} 天 / ${s.hours}h`;
+  $('#tw-due').textContent = `到期 ${s.due} 张`;
+  const warn = s.warnings && s.warnings.length ? `（${s.warnings[0]}）` : '';
+  $('#tw-plan').textContent = `${s.headline}${warn}${s.done_today ? ' · 今日已打卡 ✅' : ''}`;
+  // 近 7 日出勤格子（旧→今）：实心=完整学习 / 半透明=保签 / 灰=缺
+  $('#tw-week').innerHTML = s.week.map(d =>
+    `<span class="tw-d ${d.s}" title="${d.d} ${{full: '完整学习', minimal: '保签', miss: '未出勤'}[d.s] || d.s}"></span>`
+  ).join('');
+  tutorRefreshLog();
+}
+
+/* 学习内容日志（tutor_log 桥）：progress.md「学习记录」表为主体 + 打卡备注兜底 */
+const twEsc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+let twLogData = null;               // 最近一次内容数据（展开/收起只重渲染，免重拉）
+let twLogOpen = new Set();          // 已展开的日期集合
+
+function tutorRenderLog(lg) {
+  const box = $('#tw-log');
+  if (!lg) { box.innerHTML = '<div class="tl-empty">学习内容不可用</div>'; return; }
+  if (!lg.log.length) { box.innerHTML = '<div class="tl-empty">近 7 天暂无学习记录</div>'; return; }
+  const rows = [];
+  if (lg.log[0].day !== lg.today) rows.push('<div class="tl tl-muted"><span class="d">今天</span><span class="s">尚无学习记录</span></div>');
+  lg.log.forEach(day => {
+    const meta = day.minutes != null ? `${day.minutes}min${day.mode === 'minimal' ? '·保签' : ''}` : '';
+    const first = (day.items[0] && day.items[0].content) || day.note || '（无内容备注）';
+    const open = twLogOpen.has(day.day);
+    rows.push(
+      `<div class="tl" data-day="${day.day}">` +
+      `<span class="d">${day.day.slice(5)}</span>` +
+      (meta ? `<span class="d">${twEsc(meta)}</span>` : '') +
+      `<span class="s">${twEsc(first)}</span>` +
+      `<span class="arr">${open ? '▲' : '▼'}</span></div>`
+    );
+    if (open) {
+      const parts = [];
+      day.items.forEach(it => {
+        parts.push(`<div>${twEsc(it.content)}</div>`);
+        if (it.output) parts.push(`<div class="o">产出：${twEsc(it.output)}</div>`);
+      });
+      if (day.note && day.items.length) parts.push(`<div class="o">打卡备注：${twEsc(day.note)}</div>`);
+      if (!day.items.length) parts.push(`<div>${twEsc(day.note || '（无内容备注）')}</div>`);
+      rows.push(`<div class="tl-detail">${parts.join('')}</div>`);
+    }
+  });
+  box.innerHTML = rows.join('');
+}
+
+async function tutorRefreshLog() {
+  const lg = await api.tutor_log(7).catch(() => null);
+  if (lg && lg.ok) twLogData = lg;    // 拉取失败沿用旧数据，不打断 widget
+  tutorRenderLog(twLogData);
+}
+
+async function tutorCheckin(mode) {
+  const min = Math.max(1, Math.min(600, parseInt($('#tw-min').value, 10) || 110));
+  const btn = mode === 'full' ? $('#tw-full') : $('#tw-minimal');
+  btn.disabled = true;
+  const note = $('#tw-note').value.trim();
+  const r = await api.tutor_checkin(min, mode, note).catch(() => null);
+  btn.disabled = false;
+  if (r && r.ok) {
+    $('#tw-note').value = '';
+    toast(`学习打卡 ✅ 连续 ${r.current_streak} 天 / 累计 ${r.total_days} 天`);
+    tutorRefresh();
+  } else {
+    toast('打卡失败：' + (r && r.err ? r.err : 'agent-study 不可用'));
+  }
+}
+
+$('#tw-full').addEventListener('click', () => tutorCheckin('full'));
+$('#tw-minimal').addEventListener('click', () => tutorCheckin('minimal'));
+$('#tw-log').addEventListener('click', ev => {
+  const row = ev.target.closest('.tl[data-day]');
+  if (!row) return;
+  const d = row.dataset.day;
+  if (twLogOpen.has(d)) twLogOpen.delete(d); else twLogOpen.add(d);
+  tutorRenderLog(twLogData);          // 展开/收起只重渲染，不重拉
+});
+
+
+/* ========== 右侧小工具区：tab 切换机制（后续追加 WIDGETS 即可） ========== */
 
 const WIDGETS = [
-  { id: 'pomo', label: '番茄钟', icon: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>' },
   { id: 'notes', label: '记事本', icon: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>' },
   { id: 'report', label: '日报', icon: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>' },
+  { id: 'tutor', label: '学习', icon: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5Z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>',
+    onshow: () => tutorRefresh() },
 ];
-let widgetActive = 'pomo';
+let widgetActive = 'notes';   // 番茄钟已删除（2026-09-22）：旧 config 的 active_widget:'pomo' 不匹配 WIDGETS，自动落回此默认
 
 function renderWidgetTabs() {
   const bar = $('#widget-tabs'); bar.innerHTML = '';
@@ -2164,125 +2310,17 @@ function renderWidgetTabs() {
       CFG.active_widget = w.id;   // 记住上次使用的工具（与分组记忆同套路）
       persist();
       renderWidgetTabs();
+      if (w.onshow) w.onshow();   // 切到该 tab 时拉取实时数据（如学习概览）
     };
     bar.appendChild(el);
   });
-  // 同步切换面板可见性（面板 id 约定：w-{widget id}）——漏掉这步曾导致番茄钟空白
+  // 同步切换面板可见性（面板 id 约定：w-{widget id}）——漏掉这步曾导致面板空白
   document.querySelectorAll('.widget').forEach(el => {
     el.classList.toggle('show', el.id === 'w-' + widgetActive);
   });
 }
 
-/* ========== 番茄钟（时间戳驱动：WebView2 页面不可见时 setInterval 被节流至 1Hz，
-   用剩余毫秒数而非 tick 计数，节流/休眠都不丢时；到点走系统 toast 通知） ========== */
-
-const POMO = { focus: 25, rest: 5, mode: 'focus', total: 25 * 60, remain: 25 * 60, endAt: null, running: false };
-let pomoCfgLoaded = false;   // 时长配置是否已从 config 恢复过（防每次唤起重置暂停状态）
-const RING_LEN = 2 * Math.PI * 52;   // r=52 周长
-const pomoLen = () => (POMO.mode === 'focus' ? POMO.focus : POMO.rest) * 60;
-
-function pomoRender() {
-  const m = Math.floor(POMO.remain / 60), s = Math.floor(POMO.remain % 60);
-  $('#pomo-time').textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  $('#pomo-ring').style.strokeDasharray = RING_LEN;
-  $('#pomo-ring').style.strokeDashoffset = RING_LEN * (1 - POMO.remain / POMO.total);
-  const isBreak = POMO.mode === 'rest';
-  $('#pomo-mode').textContent = isBreak ? `☕ 休息 ${POMO.rest}′` : `🍅 专注 ${POMO.focus}′`;
-  $('#pomo-toggle').textContent = POMO.running ? '暂停' : (POMO.remain < POMO.total ? '继续' : '开始');
-  $('#pomo-state').textContent = POMO.running
-    ? (isBreak ? '休息中…' : '专注中…')
-    : (POMO.remain < POMO.total ? '已暂停' : (isBreak ? '准备休息' : '准备专注'));
-  $('.pomo-ring').classList.toggle('break', isBreak);
-}
-
-function pomoToggle() {
-  if (POMO.running) {                       // 暂停：冻结剩余秒数
-    POMO.remain = Math.max(0, (POMO.endAt - Date.now()) / 1000);
-    POMO.running = false; POMO.endAt = null;
-  } else {                                  // 开始/继续：按剩余秒数定终点
-    POMO.endAt = Date.now() + POMO.remain * 1000;
-    POMO.running = true;
-  }
-  pomoRender();
-}
-
-function pomoSwitchMode() {
-  POMO.mode = POMO.mode === 'focus' ? 'rest' : 'focus';
-  POMO.total = pomoLen(); POMO.remain = POMO.total;
-  POMO.running = false; POMO.endAt = null;
-  pomoRender();
-}
-
-function pomoReset() {
-  POMO.total = pomoLen(); POMO.remain = POMO.total;
-  POMO.running = false; POMO.endAt = null;
-  pomoRender();
-}
-
-function pomoFinish() {
-  POMO.running = false; POMO.endAt = null; POMO.remain = 0;
-  const wasFocus = POMO.mode === 'focus';
-  if (wasFocus) {
-    // 完成一段专注即落盘（今日看板/顶部条/日报素材四的数据源；只保最近 60 天）
-    const tk = dayKey(new Date());
-    CFG.pomo_log = (CFG.pomo_log || []).filter(x => x.date >= dayKey(new Date(Date.now() - 60 * 864e5)));
-    CFG.pomo_log.push({ date: tk, focus_min: POMO.focus, at: new Date().toISOString() });
-    persist();
-  }
-  api.notify('YY工具箱 · 番茄钟',
-    wasFocus ? `🍅 专注 ${POMO.focus} 分钟完成，休息一下吧！` : '☕ 休息结束，继续专注！');
-  pomoSwitchMode();                          // 自动切到另一模式待命
-}
-
-/* ---- 时长配置（⚙）：双输入 + 校验，持久化到 config（下次启动恢复） ---- */
-function showPomoConfig() {
-  return new Promise(resolve => {
-    const mask = $('#modal-mask'), m = $('#modal');
-    m.innerHTML = `<h3>番茄钟时长</h3>
-      <div class="pomo-cfg-row"><label>专注（分钟）</label><input id="pc-focus" type="number" min="1" max="180" value="${POMO.focus}"></div>
-      <div class="pomo-cfg-row"><label>休息（分钟）</label><input id="pc-rest" type="number" min="1" max="60" value="${POMO.rest}"></div>
-      <div class="err" id="pc-err"></div>
-      <div class="btns"><button id="m-cancel">取消</button><button class="primary" id="m-ok">保存</button></div>`;
-    mask.classList.add('show');
-    const fi = $('#pc-focus'), ri = $('#pc-rest');
-    fi.focus(); fi.select();
-    const done = v => { closeModal(); resolve(v); };
-    $('#m-ok').addEventListener('click', () => {
-      const f = parseInt(fi.value, 10), r = parseInt(ri.value, 10);
-      if (!(f >= 1 && f <= 180)) return $('#pc-err').textContent = '专注时长须为 1–180 的整数';
-      if (!(r >= 1 && r <= 60)) return $('#pc-err').textContent = '休息时长须为 1–60 的整数';
-      done({ focus: f, rest: r });
-    });
-    $('#m-cancel').addEventListener('click', () => done(null));
-    fi.addEventListener('keydown', ev => { if (ev.key === 'Enter') ri.focus(); });
-    ri.addEventListener('keydown', ev => { if (ev.key === 'Enter') $('#m-ok').click(); });
-  });
-}
-
-$('#pomo-cfg').addEventListener('click', async () => {
-  const v = await showPomoConfig();
-  if (!v) return;
-  POMO.focus = v.focus; POMO.rest = v.rest;
-  CFG.pomo_focus = v.focus; CFG.pomo_rest = v.rest;   // 持久化（下次启动恢复）
-  persist();
-  if (!POMO.running) {                                 // 空闲态立即按新时长重置显示；计时中不打断，下次生效
-    POMO.total = pomoLen(); POMO.remain = POMO.total; POMO.endAt = null;
-  }
-  pomoRender();
-});
-
-setInterval(() => {
-  if (!POMO.running) return;
-  POMO.remain = (POMO.endAt - Date.now()) / 1000;
-  if (POMO.remain <= 0) return pomoFinish();
-  pomoRender();
-}, 500);
-
-$('#pomo-toggle').addEventListener('click', pomoToggle);
-$('#pomo-mode').addEventListener('click', pomoSwitchMode);
-$('#pomo-reset').addEventListener('click', pomoReset);
-renderWidgetTabs();
-pomoRender();
+renderWidgetTabs();   // 桥就绪前的初始渲染（loadData 里会再刷一次）
 
 /* ========== 记事本（多页：notes_pages 数组 + notes_page 当前页；内容防抖持久化） ========== */
 

@@ -9,3 +9,6 @@ data/reports.db
 data/config.json
 data/usage.json
 data/reports/
+/config.json
+data/icons/
+data/reports_backup_*/
