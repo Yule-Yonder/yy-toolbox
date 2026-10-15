@@ -1,9 +1,10 @@
 # YY工具箱
-> 全部自研工具的分组面板统一调取（目录名：工具箱启动器）：Alt+Space 全局热键唤起、拖拽分组持久化、自动发现新工具、后台服务常驻。
+> 全部自研工具的分组面板统一调取（目录名：工具箱启动器）：Alt+Space 全局热键唤起、拖拽分组持久化、自动发现新工具、后台服务常驻、顶部工作日提醒（日报/学习 + 法定节假日联网同步）。
 
 ## 技术栈与版本
 - Python 3.12.8 64位（D:\dev\env\Python312，venv 内置于本目录 .venv）
 - pywebview 5.4（**锁定版本，勿升 6.x**，原因见已知限制第 1 条）+ WebView2（Win11 自带）
+- pythonnet 3.0.5（**锁定版本，勿升 3.2.x**，原因见已知限制第 15 条；pywebview 传递依赖，requirements 已钉）
 - pywin32 312（RegisterHotKey 全局热键 / Win32 窗口管理 / ExtractIconEx 图标提取）
 - Pillow（exe 原始图标 HICON→PNG，缓存 data/icons/）
 - 前端：web/index.html 单文件（原生 HTML5 Drag & Drop，无框架）
@@ -19,6 +20,7 @@
 │  ├─ icons/         # 自定义应用图标缓存（exe 提取的 PNG，随移除清理）
 │  ├─ _toast.ps1     # 系统 toast 通知脚本（素材 OCR 完成提示等；运行时自动生成，utf-8-sig）
 │  ├─ reports/       # 工作日报归档（YYYY-MM-DD.md，日历蓝点与「查看/编辑」数据源）
+│  ├─ holidays/      # 法定节假日年度缓存（{year}.json：{"YYYY-MM-DD": 是否上班}，启动联网同步，git 忽略）
 │  └─ _toggle.log    # 调试日志（联调观测用，git 忽略）
 ├─ .venv/            # 独立虚拟环境
 ├─ requirements.txt
@@ -46,6 +48,7 @@
 | ＋ 应用 | 添加本地应用：exe（提取原始图标）/ html 网页（Web 卡片，启动走默认浏览器）→ 命名 → 卡片可拖分组（右键卡片移除，不动源文件）|
 | ＋ 目录 | 添加文件夹：目录选择对话框 → 命名 → 琥珀色文件夹卡（点击资源管理器打开，右键可移除）|
 | 待办「日历」 | 月历视图：有记录的日期带 `闭环/总数` 徽标（红=全未闭环/黄=部分/绿=全闭环）+ 底部蓝点=当天有日报，点日期看当天明细与日报入口 |
+| 顶部提醒通知条 | header 下醒目条：工作日日报未录入 →「📝 今日日报未录入 · 点击填写」（直达日报向导）；每天学习未打卡 →「📚 今日学习未打卡 · 点击去学习」（切到学习 widget）；全部完成自动隐藏；法定节假日数据未同步时按周一~五降级判断并附提示 |
 | 日报「生成日报」 | 分步向导：① 扫描本地仓库当日 git 提交（可勾选剔除）→ ② 贴微信聊天摘录 → ③ 贴 AI 对话摘要 → ④ 云端 AI 生成草稿 → 编辑定稿保存归档；⚙ 配置仓库列表/作者过滤/AI 接口（OpenAI 兼容）/另存目录；归档可一键另存到外部日报目录 |
 | 点窗口 X | **仅隐藏**，服务常驻 |
 | 面板「退出」按钮 | 真正退出进程 |
@@ -58,6 +61,7 @@ TOOLS.md 登记新工具（create-tool skill 流程）后，面板下次唤起�
 - 格式：`{"groups": [{"name": "组名", "tools": ["工具主键", ...]}], "ungrouped": [...], "external_dirs": ["外部目录路径", ...], "bg_enabled": true}`
 - 工具主键：根目录工具=目录名（与 TOOLS.md 目录列一致）；外部目录工具=`ext:{exe文件名}`；自定义应用=`app:{路径md5前10位}`（防撞前缀）
 - `external_dirs`：外部工具目录（如 D:\company\机器狗\自研工具），扫描其中所有裸 exe/bat，手工追加路径即可扩展
+- `data/holidays/{year}.json`：法定节假日缓存（{"YYYY-MM-DD": true=调休补班上班 / false=法定放假}）；数据源 timor.tech 免费节假日 API，启动后台线程同步当年+次年（有缓存不打网络，失败每 6h 重试），未同步时日报提醒按周一~五降级
 - 已删工具自动清出、新工具自动进未分组
 
 ## 当前状态：源码 ↔ release 同步性
@@ -78,6 +82,7 @@ release/YY工具箱.exe（onedir）存档于 2026-09-11，已落后于 09-15/09-
 10. **Win+D/Win+M 是唤起失效的元凶**（2026-08-29 实锤修复）：「显示桌面」会把 TOOLWINDOW 一并最小化，而 SetWindowPos 对最小化窗口无效（位置被系统钉在 -32000）→ 唤起"没反应"。且最小化时 Chromium 不一定发 blur，visible 标志漂移会让下次热键误走 hide 分支。修复三件套：`_restore_if_iconic`（SW_RESTORE 主路 + SC_RESTORE 消息兜底）+ `_force_foreground`（前台锁定时 Alt 合成 + AttachThreadInput 强抢）+ **toggle 按窗口真实物理状态分支**（非最小化且屏内=可见，不信 visible 标志）；show 后有 `show chk` 校验日志可诊断
 11. **屏外隐藏会导致 WebView2 白屏**（2026-08-29 实锤修复）：Chromium 原生窗口遮挡检测（CalculateNativeWinOcclusion）把 -32000 屏外窗口判为 hidden 挂起光栅化，长时间（过夜/驱动重置）后移回屏内合成器恢复失败 → 整窗纯白但 JS 仍活着（纯白=WebView2 默认底色，非页面色）。修复：① `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--disable-features=CalculateNativeWinOcclusion`（进程启动前设置，治本——不挂起）；② show 时 1px 尺寸抖动 + RedrawWindow(RDW_ALLCHILDREN)（治标兜底——已挂起也能强拉回合成器）。15 秒屏外挂起→唤起实测画面完整
 12. **唤起后被前台应用"秒抢回"**（2026-08-31 实锤修复）：带防切屏/焦点抢占脚本的页面（如实测某巡检系统 Chrome 页 1.8s 抢回）会在面板唤起后瞬间夺走前台 → blur → 面板闪现即隐（=用户报"唤起后找不到"）。修复：唤起 1.5s 宽限期——期间 JS blur（hide_panel(true)）视为抢占而非用户离开，重抢前台一次（每显示周期仅一次，防与蜜罐页面 ping-pong）；1.5s 内人类来不及点击别窗，不误伤正常失焦隐藏。诊断工具：empty/工具箱启动器/blur_probe.py（100ms 高频观测 rect+前台窗口名）
+15. **pythonnet 锁 3.0.5 + release exe 常驻占互斥**（2026-10-15 venv 重建实锤）：① pythonnet 是 pywebview 传递依赖，requirements 未钉时 pip 拉到 3.2.1，窗口初始化异常（不写 ready 日志、pythonw 下秒退）——因干扰未做干净归因，保守钉回上次可用组合 3.0.5（配套 clr_loader 0.2.10 自动降级），requirements 已钉；② release 打包版 YY工具箱.exe 后台常驻时持有单实例互斥体 `YT_ToolBox_SingleInstance`，源码版启动会被"已在运行"MessageBox 阻塞且 pythonw 无控制台完全不可见（进程活着、无日志、无窗口，像是神秘卡死）——排查启动问题先 `tasklist | findstr YY工具箱` 排除 exe 残留
 
 ## 迭代记录
 - 2026-08-26 初始版本：Alt+Space 热键面板 + 拖拽分组持久化 + 工具自动发现 + 后台服务常驻（点 X 隐藏）+ 开机自启 + 任务栏隐身；联调修复 pywebview 桥死（Api 属性污染）、z 序置顶（TOPMOST→NOTOPMOST 配方）、存量 bat LF 隐患（根目录全部工具 bat 批量转 CRLF）
@@ -132,3 +137,6 @@ release/YY工具箱.exe（onedir）存档于 2026-09-11，已落后于 09-15/09-
 - 2026-10-09 学习 widget 三轮：面板排版修复 + 详情独立窗口（用户截图反馈"面板还是丑，详情要独立窗口"）：① 根因实锤——`#w-tutor` 漏做 align-items:stretch 覆盖（.widget 默认 center 让子项缩成内容宽呈"居中一坨"，同 #w-report 09-04 的坑），补 `#w-tutor{align-items:stretch;width:100%}`；② 概览行升级为 GitHub profile stats 式统计条（连续/累计/到期三块底色圆角卡：值 600 加粗 + 标签弱化，JS 改 innerHTML 渲染）；③ 出勤格子加描边（miss 态不再是隐形空档）；④ 打卡行重排：时长输入居左，保签/打卡右聚组（主操作最右）；⑤ 学习内容区加题头「学习内容 · 近 7 天」+ 右侧「全部 ›」入口；⑥ **详情交互改独立窗口**：`Api.tutor_open_log(day)` 用 `_tutor_log_page` 预渲染近 30 天 GitHub 风格静态页（亮/暗双色板 prefers-color-scheme 自适应、日期 h2 分节 + 编号条目 + 产出/备注弱化行 + 行内码/加粗渲染；day 参数 scrollIntoView 定位 + focus 高亮），`webview.create_window` 丢工作线程调用防阻塞桥；widget 列表简化为"一行预览 + 点击开窗"，移除原地展开（twLogOpen/tw-day 折叠体系删除）。验证：py_compile / node --check 过，孤儿类名清零检查过（rb-sep 两处为日报 widget 自有样式非残留），真实数据端到端冒烟过（focus 高亮/滚动脚本/空态断言）
 - 2026-10-09 修复详情独立窗"出现即消失 + 面板被隐藏"（用户实报）：根因是面板失焦链——详情窗夺焦 → JS blur → hide_panel(true)，唤起 1.5s 宽限期内走重抢分支（_show_win 置顶配方把面板重新顶到 z 序最上），刚弹出的详情窗被压到身后（="出现即消失"）；超宽限期则走自动隐藏（="工具箱也被隐藏"）。修复：新增模块级 _LOG_WIN_OPEN 存活旗标——hide_panel 的 blur 分支在详情窗存活期间直接抑制（面板保持可见、不重抢焦点），窗口 closed 事件复位旗标恢复正常失焦隐藏；旗标先置位再建窗（面板 blur 事件可能先于建窗返回到达）、建窗失败强制复位（防 blur 隐藏永久失效）。已核实 pywebview 5.4 运行时建窗为非阻塞（Invoke 编组主 UI 线程 Show 后即返，windows.append 持有引用），closed 事件注册时序安全。实测：抑制分支日志落地 + 复位断言通过
 - 2026-10-09 日历集成学习打卡两功能（用户需求）：① 每日格左上角绿色✓标识（`.cal-cell i.stu` 覆盖 left 定位，#10B981 同闭环绿；tooltip 显示分钟数/保签）——数据经新桥 `Api.tutor_month_checkins(year, month)` 按月拉取（CAL_STUDY 缓存，showCalendar 与 ‹›翻月均 await 刷新，桥不可用静默降级不显示✓不影响日历）；② 详情区新增学习行（⏱ 已学习 N 分钟（保签）+「修改时长」），行内编辑（number 输入 1-600、Enter 保存、取消回显），走新桥 `Api.tutor_edit_checkin(day, minutes)`——只改 minutes 保留原 mode/note（经 record_checkin 覆盖写），已有打卡才可改（不支持补卡，防污染保签/恢复等级语义），修改成功同步 CAL_STUDY 并返回累计统计回执。冒烟：真实数据月拉取/同值回写/6 项边界断言过，checkins.json 字节级备份还原保护
+- 2026-10-12 顶部工作日提醒通知条（用户需求"日报每个工作日提醒录入+每日学习醒目提醒"）：① **法定工作日联网同步**——新增节假日模块（app.py）：数据源 timor.tech 全年节假日 API（已实测含 2026 调休补班），解析 holiday=False=补班/True=放假，按年缓存 data/holidays/{year}.json；外部调用三要素：10s 超时/重试 2 次间隔 3s/兜底 本地缓存→周一~五默认；后台 daemon 线程启动同步当年+次年（有缓存不打网络），每 6h 一轮兼顾跨年与国务院次年数据发布滞后（约 11 月底）；is_workday None=未同步降级。② **顶部通知条**（#notice-bar，header 与今日概览条之间）——工作日日报未录入「📝 点击填写」直达日报向导；每天学习未打卡「📚 点击去学习」切学习 widget（streak 按自然日连续，故学习提醒含周末节假日，用户确认）；两未完成并列显示、完成即撤（repSave/tutorCheckin 成功回调实时刷新）；未同步年份附「⚠ 按周一至五判断」提示。③ 新桥 Api.notice_state() 一次聚合 工作日/日报/学习三状态（report_get + checkin.load_checkins，tutor 不可用返回 None 防换机误报）。注：本轮 Desktop junction（C:\Users\YY\Desktop\自研工具）再次断裂致 Bash 全程 ENOENT，py_compile/node --check 与 git 均未执行，验证改由子代理全文审查 + 待用户修 junction 后补跑
+- 2026-10-12 学习打卡改时长入口扩展 + 撤回打卡（用户需求"支持修改打卡时间+撤回打卡"；改时长此前仅日历详情区有）：① **数据层**——agent-study tutor/checkin.py 新增 delete_checkin(day)（删键写回，有记录 True/无记录 False），pytest 补 2 用例（撤回后连续天数按剩余记录重算/无记录日返回 False）；② **后端桥**——Api.tutor_delete_checkin(day)（正则校验日期，返回撤回后最新连续/累计统计）；③ **学习 widget 日志行内操作**——近 7 天每行（有打卡记录的）hover 浮现「✎ 改时长 / ✕ 撤回」小钮：✎ 整行切换编辑态（number 输入 1-600、Enter/保存提交、取消/失败重绘恢复，成功后概览统计与日志同步刷新），✕ 走 showConfirm 确认后撤回；行点击开详情窗的原逻辑对操作钮拦截不冒泡；④ **日历详情区**——学习行「修改时长」旁新增「撤回」按钮，确认用**行内二次确认**（首点变「确认撤回？」、3s 未确认自动复原）而非 showConfirm——实锤 showConfirm 复用单例 #modal，而日历自身就显示在 #modal 里，确认框会把日历整个顶掉；撤回成功整历重绘（✓ 徽标消失、详情行回落无打卡）+ CAL_STUDY 同步删除；⑤ **联动**——两处撤回成功后均调 refreshNotices()（撤回今天的打卡 → 顶部学习提醒即时回归）。注：连带发现既有 bug——repExport 在向导内用 showConfirm 做覆盖确认会把日报向导顶掉（同款单例互踩，历史遗留未修）
+- 2026-10-15 venv 重建修复（D 盘清理误删后工具箱启动报"未找到 .venv"）：按 create-tool §2 用 Python312 原位重建 .venv（清华源），pip check 通过；启动链实测全通（migrate→ready→hotkey 注册成功→shot hook ok→bridge get_all，与历史正常启动日志模式一致），Alt+Space 唤起恢复。requirements 补钉 pythonnet==3.0.5、rapidocr-onnxruntime==1.4.4（见已知限制 15）。排查实锤两个环境坑：① release 打包版 YY工具箱.exe 后台常驻持单实例互斥，源码版启动被"已在运行"弹窗阻塞且 pythonw 下不可见（用户当天 9:13 手动启动过 exe，验证时已停、源码版顶上）；② pythonnet 3.2.1 疑与 pywebview 5.4 不兼容（干扰下未干净归因，保守钉回）。release 同步性不变：仍落后于本迭代，待发布指令

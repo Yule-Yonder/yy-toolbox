@@ -550,6 +550,27 @@
   #today-bar .tb-item.done { color: #10B981; }   /* 日报已归档绿 */
   #today-bar .tb-sep { color: var(--text-3); }
 
+  /* ---- ★ 顶部提醒通知条（工作日日报 / 每日学习；未完成才出现，可点击直达） ---- */
+  #notice-bar {
+    display: flex; align-items: center; gap: 8px; padding: 7px 16px;
+    background: linear-gradient(90deg, var(--accent-subtle), transparent 65%);
+    border-bottom: 1px solid var(--divider);
+  }
+  #notice-bar[hidden] { display: none; }   /* 显式压制：否则 flex 声明会盖过 hidden 默认样式 */
+  #notice-bar .nb-item {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--accent); color: var(--on-accent);
+    border: none; font: inherit; font-size: 12px; font-weight: 600;
+    padding: 5px 14px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0, 103, 192, .28);
+    animation: nb-pop 260ms var(--ease-hover);
+    transition: filter 150ms var(--ease-hover), transform 150ms var(--ease-hover), box-shadow 150ms var(--ease-hover);
+  }
+  #notice-bar .nb-item:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 103, 192, .38); }
+  #notice-bar .nb-item:active { transform: translateY(0); }
+  #notice-bar .nb-sub { font-size: 10.5px; color: var(--text-3); }
+  @keyframes nb-pop { from { opacity: 0; transform: scale(.92); } }
+
   /* ---- ★ 日报 widget 看板 + 最近日报流 ---- */
   .rw-board-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); padding: 2px 2px 0; }
   .rw-board-row .rb-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -588,6 +609,19 @@
   .tw-row .min { flex: none; font-size: 10.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
   .tw-row .s { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tw-row .arr { flex: none; color: var(--text-3); }
+  /* 行内改时长/撤回（hover 浮现的小操作钮；点击不冒泡开详情窗） */
+  .tw-row .ops { flex: none; display: none; gap: 2px; }
+  .tw-row:hover .ops { display: inline-flex; }
+  .tw-op {
+    background: none; border: none; cursor: pointer; font-size: 11px; line-height: 1;
+    color: var(--text-3); padding: 2px 4px; border-radius: 4px;
+    transition: color 150ms var(--ease-hover), background-color 150ms var(--ease-hover);
+  }
+  .tw-op:hover { color: var(--accent); background: var(--subtle-hover); }
+  .tw-edit-inp {
+    flex: none; width: 52px; padding: 2px 6px; border: 1px solid var(--accent); border-radius: var(--radius-md);
+    font-size: 11.5px; font-family: inherit; color: var(--text-1); background: var(--card-bg); outline: none;
+  }
   .tw-pill { flex: none; align-self: center; font-size: 10px; line-height: 1; padding: 2px 6px; border-radius: 999px; font-weight: 500; }
   .tw-pill.minimal { background: rgba(245, 158, 11, .16); color: #D97706; }
   .tw-log strong { font-weight: 600; color: var(--text-1); }
@@ -766,6 +800,9 @@
   <button class="ghost danger" id="btn-quit">退出</button>
 </header>
 
+<!-- ★ 顶部提醒通知条：工作日日报 / 每日学习未完成时醒目提示（可点击直达），全部完成自动隐藏 -->
+<div id="notice-bar" hidden></div>
+
 <!-- ★ 今日工作概览条：极薄一行扫一眼今日工作量；数字即入口（提交→向导 / 日报→今日日报 / AI→设置） -->
 <div id="today-bar">
   <button class="tb-item" id="tb-commit" title="今日 git 提交 · 点击按项目查看提交明细">提交 –</button><span class="tb-sep">·</span>
@@ -921,6 +958,7 @@ async function loadData() {
   renderWidgetTabs();
   renderTabs(); renderGrid(); renderTodos();
   refreshReportState();   // 日报 widget 状态行（异步不阻塞主渲染）
+  refreshNotices();       // 顶部提醒通知条（异步不阻塞主渲染）
   if (widgetActive === 'tutor') tutorRefresh();   // 学习 widget：上次停在它时随主刷新拉新
 }
 
@@ -1476,7 +1514,7 @@ function renderCalDetail(k, map) {
   const rowsHtml = rows.length ? `<div class="cd-items">${rows.join('')}</div>` : '';
   const stu = CAL_STUDY[k];
   const studyRow = stu
-    ? `<div class="cd-study" id="cd-study"><span>⏱ 已学习 <b>${stu.minutes}</b> 分钟${stu.mode === 'minimal' ? '（保签）' : ''}</span><span style="flex:1"></span><button class="mini-btn" id="cd-stu-edit" title="修改该日学习时长">修改时长</button></div>`
+    ? `<div class="cd-study" id="cd-study"><span>⏱ 已学习 <b>${stu.minutes}</b> 分钟${stu.mode === 'minimal' ? '（保签）' : ''}</span><span style="flex:1"></span><button class="mini-btn" id="cd-stu-edit" title="修改该日学习时长">修改时长</button><button class="mini-btn" id="cd-stu-del" title="撤回该日打卡记录">撤回</button></div>`
     : `<div class="cd-study"><span class="cd-stu-none">无学习打卡</span></div>`;
   box.innerHTML = `<div class="cd-title">${d.getMonth() + 1} 月 ${d.getDate()} 日 · ${rows.length ? `${e.open.length} 进行 / ${e.closed.length} 闭环` : '无待办记录'}</div>${studyRow}${repRow}${rowsHtml}`;
   const stuEdit = $('#cd-stu-edit');
@@ -1499,6 +1537,31 @@ function renderCalDetail(k, map) {
     $('#cd-stu-cancel').addEventListener('click', () => renderCalDetail(k, map));
     $('#cd-stu-save').addEventListener('click', save);
     inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') save(); });
+  });
+  const stuDel = $('#cd-stu-del');
+  if (stuDel) stuDel.addEventListener('click', async () => {
+    // 行内二次确认（不可用 showConfirm：日历自身就在单例 #modal 里，确认框会把日历顶掉）
+    if (stuDel.dataset.armed !== '1') {
+      stuDel.dataset.armed = '1';
+      stuDel.textContent = '确认撤回？';
+      const disarm = () => {
+        clearTimeout(stuDel._timer);
+        if (stuDel.isConnected) { stuDel.dataset.armed = ''; stuDel.textContent = '撤回'; }
+      };
+      stuDel._timer = setTimeout(disarm, 3000);   // 3s 未确认自动解除，防误留武装态
+      return;
+    }
+    clearTimeout(stuDel._timer);
+    const r = await api.tutor_delete_checkin(k).catch(() => null);
+    if (r && r.ok) {
+      delete CAL_STUDY[k];
+      toast(`已撤回 ${k} 打卡 ✓ 连续 ${r.current_streak} 天`);
+      renderCalendar();   // 整历重绘：✓ 徽标消失、详情行回落「无学习打卡」
+    } else {
+      toast('撤回失败：' + (r && r.err ? r.err : 'tutor 不可用'));
+      stuDel.dataset.armed = ''; stuDel.textContent = '撤回';
+    }
+    refreshNotices();   // 撤回今天的打卡 → 顶部学习提醒回归
   });
   const items = box.querySelectorAll('.cd-item');
   const all = [...e.open, ...e.closed];
@@ -2022,6 +2085,7 @@ async function repSave() {
   setRepFoot(`已归档：${r.path}`);
   toast('日报已归档 ✓');
   refreshReportState();
+  refreshNotices();   // 归档成功即时撤下顶部日报提醒
 }
 
 async function repExport() {
@@ -2301,13 +2365,17 @@ function tutorRenderLog(lg) {
   if (lg.log[0].day !== lg.today) rows.push('<div class="tw-muted-row">今天 · 尚无学习记录</div>');
   lg.log.forEach(day => {
     const first = day.items[0] ? day.items[0].content : (day.note || '（无内容备注）');
+    const ops = day.minutes != null   // 有打卡记录才可改/撤（纯 progress.md 学习记录日无可操作项）
+      ? '<span class="ops"><button class="tw-op" data-op="edit" title="修改该日时长">✎</button>' +
+        '<button class="tw-op" data-op="del" title="撤回该日打卡">✕</button></span>'
+      : '';
     rows.push(
       `<div class="tw-row" data-day="${day.day}" title="点击在独立窗口查看全文">` +
       `<span class="d">${day.day.slice(5)}</span>` +
       (day.minutes != null ? `<span class="min">${day.minutes}min</span>` : '') +
       (day.mode === 'minimal' ? '<span class="tw-pill minimal">保签</span>' : '') +
       (day.items.length > 1 ? `<span class="min">${day.items.length} 条</span>` : '') +
-      `<span class="s">${twMd(first)}</span><span class="arr">›</span></div>`
+      `<span class="s">${twMd(first)}</span>${ops}<span class="arr">›</span></div>`
     );
   });
   box.innerHTML = rows.join('');
@@ -2330,6 +2398,7 @@ async function tutorCheckin(mode) {
     $('#tw-note').value = '';
     toast(`学习打卡 ✅ 连续 ${r.current_streak} 天 / 累计 ${r.total_days} 天`);
     tutorRefresh();
+    refreshNotices();   // 打卡成功即时撤下顶部学习提醒
   } else {
     toast('打卡失败：' + (r && r.err ? r.err : 'agent-study 不可用'));
   }
@@ -2338,11 +2407,58 @@ async function tutorCheckin(mode) {
 $('#tw-full').addEventListener('click', () => tutorCheckin('full'));
 $('#tw-minimal').addEventListener('click', () => tutorCheckin('minimal'));
 $('#tw-log').addEventListener('click', ev => {
+  const op = ev.target.closest('.tw-op');
   const row = ev.target.closest('.tw-row[data-day]');
   if (!row) return;
+  if (row.querySelector('.tw-edit-inp')) return;   // 编辑态整行拦截：点输入框等非按钮区域不冒泡开详情窗
+  if (op) {   // 行内操作：改时长 / 撤回打卡（拦截冒泡，不打开详情窗）
+    if (op.dataset.op === 'edit') twEditRow(row);
+    else if (op.dataset.op === 'del') twDeleteRow(row.dataset.day);
+    return;
+  }
   api.tutor_open_log(row.dataset.day).catch(() => {});   // 独立窗口看近 30 天全文并定位到该日
 });
 $('#tw-all').addEventListener('click', () => api.tutor_open_log('').catch(() => {}));
+
+/* ---- 行内改时长：整行换成编辑态（保存/取消；取消或失败直接重绘日志区恢复） ---- */
+function twEditRow(row) {
+  const day = row.dataset.day;
+  const entry = (twLogData && twLogData.log.find(x => x.day === day)) || {};
+  row.innerHTML = `<span class="d">${day.slice(5)}</span>` +
+    `<input class="tw-edit-inp" type="number" min="1" max="600" value="${entry.minutes ?? ''}">` +
+    `<span class="min">分钟</span><span style="flex:1"></span>` +
+    `<button class="tw-op" data-op="cancel">取消</button><button class="tw-op" data-op="save">保存</button>`;
+  const inp = row.querySelector('.tw-edit-inp');
+  inp.focus(); inp.select();
+  row.querySelector('[data-op="cancel"]').addEventListener('click', () => tutorRenderLog(twLogData));
+  const save = async () => {
+    const v = parseInt(inp.value, 10);
+    if (!v || v < 1 || v > 600) return toast('⚠️ 时长需在 1-600 分钟之间');
+    const r = await api.tutor_edit_checkin(day, v).catch(() => null);
+    if (r && r.ok) {
+      toast(`已修改 ${day.slice(5)} 学习时长为 ${v} 分钟 ✓`);
+      tutorRefresh(); tutorRefreshLog();   // 重拉日志出编辑态 + 概览统计随新时长刷新
+    } else {
+      toast('修改失败：' + (r && r.err ? r.err : 'tutor 不可用'));
+      tutorRenderLog(twLogData);
+    }
+  };
+  row.querySelector('[data-op="save"]').addEventListener('click', save);
+  inp.addEventListener('keydown', ev2 => { if (ev2.key === 'Enter') save(); });
+}
+
+/* ---- 撤回某日打卡（后悔药：删错/误触打卡；撤回今天的会重新触发顶部学习提醒） ---- */
+async function twDeleteRow(day) {
+  if (!await showConfirm('撤回打卡', `撤回 ${day.slice(5)} 的学习打卡？\n撤回后该日出勤与时长移除，连续天数重算。`)) return;
+  const r = await api.tutor_delete_checkin(day).catch(() => null);
+  if (r && r.ok) {
+    toast(`已撤回 ${day.slice(5)} 打卡 ✓ 连续 ${r.current_streak} 天 / 累计 ${r.total_days} 天`);
+    tutorRefresh(); tutorRefreshLog();
+    refreshNotices();
+  } else {
+    toast('撤回失败：' + (r && r.err ? r.err : 'tutor 不可用'));
+  }
+}
 
 
 /* ========== 右侧小工具区：tab 切换机制（后续追加 WIDGETS 即可） ========== */
@@ -2378,6 +2494,53 @@ function renderWidgetTabs() {
 }
 
 renderWidgetTabs();   // 桥就绪前的初始渲染（loadData 里会再刷一次）
+
+/* ========== 顶部提醒通知条（工作日日报 / 每日学习） ========== */
+
+/* 切换到指定 widget 并触发其刷新（通知条学习提醒入口与 widget tab 共用同一套切换逻辑） */
+function gotoWidget(id) {
+  const w = WIDGETS.find(x => x.id === id);
+  if (!w) return;
+  widgetActive = id;
+  CFG.active_widget = id;
+  persist();
+  renderWidgetTabs();
+  if (w.onshow) w.onshow();
+}
+
+async function refreshNotices() {
+  const bar = $('#notice-bar');
+  if (!bar) return;
+  const s = await api.notice_state().catch(() => null);
+  if (!s) { bar.hidden = true; return; }
+  const items = [];
+  // 日报提醒：仅工作日（法定日历未同步时按周一~五降级，并在条尾附提示）
+  const dow = new Date(s.today + 'T00:00:00').getDay();
+  const workdayLike = s.workday === true || (s.workday === null && dow >= 1 && dow <= 5);
+  if (!s.report_done && workdayLike) {
+    items.push({ icon: '📝', text: '今日日报未录入 · 点击填写', act: () => openReport(dayKey(new Date())) });
+  }
+  // 学习提醒：每天（学习 streak 按自然日连续，断签清零）；tutor 不可用（null）不提醒防误报
+  if (s.tutor_done === false) {
+    items.push({ icon: '📚', text: '今日学习未打卡 · 点击去学习', act: () => gotoWidget('tutor') });
+  }
+  bar.innerHTML = '';
+  if (!items.length) { bar.hidden = true; return; }
+  bar.hidden = false;
+  items.forEach(it => {
+    const b = document.createElement('button');
+    b.className = 'nb-item';
+    b.textContent = `${it.icon} ${it.text}`;
+    b.addEventListener('click', it.act);
+    bar.appendChild(b);
+  });
+  if (!s.synced) {
+    const sub = document.createElement('span');
+    sub.className = 'nb-sub';
+    sub.textContent = '⚠ 法定节假日未同步，暂按周一至五判断';
+    bar.appendChild(sub);
+  }
+}
 
 /* ========== 记事本（多页：notes_pages 数组 + notes_page 当前页；内容防抖持久化） ========== */
 

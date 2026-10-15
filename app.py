@@ -23,6 +23,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.request
 from ctypes import wintypes
 from datetime import date
 from pathlib import Path
@@ -46,6 +47,7 @@ REPORTS_DIR = APP_DIR / 'data' / 'reports'  # 工作日报 md 副本（data/repo
 DB_PATH = APP_DIR / 'data' / 'reports.db'   # 日报权威存储（SQLite，年度述职数据源；含按日量化快照列）
 USAGE_PATH = APP_DIR / 'data' / 'usage.json'  # AI token 用量记账（累计 + 按日，花费按记录时点单价折算）
 ASSETS_DIR = REPORTS_DIR / 'assets'        # 微信截屏素材库（assets/YYYY-MM-DD/HHMMSS.png）
+HOLIDAY_DIR = APP_DIR / 'data' / 'holidays'  # 法定节假日年度缓存 {year}.json：{"YYYY-MM-DD": 是否上班}
 SELF_DIR_NAME = APP_DIR.name               # 扫描时排除自身
 
 # ---------- Win32 常量与句柄 ----------
@@ -333,6 +335,94 @@ def scan_apps(cfg: dict) -> list:
     return tools
 
 
+# ============================== 法定工作日（节假日+调休联网同步） ==============================
+
+_HOLIDAY_API = 'https://timor.tech/api/holiday/year/{year}'   # 免费节假日 API（含国务院年度调休安排）
+_HOL_LOCK = threading.Lock()
+_HOL_DATA = {}       # {year -> {iso_date: True=调休补班上班 / False=法定放假日}}（进程内权威查询表）
+_HOL_SYNCED = set()  # 已就绪年份（API 成功或缓存加载成功均算；未就绪年份 is_workday 返回 None）
+
+
+def _holiday_fetch(year: int):
+    """拉取 timor.tech 全年节假日表。外部调用三要素：10s 超时 / 失败重试 2 次（间隔 3s）/
+    全败返回 None（调用方回落本地缓存，再回落周一~五默认）。带浏览器 UA 防 python-urllib 被源站指纹拦截。"""
+    req = urllib.request.Request(_HOLIDAY_API.format(year=year), headers={
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) YYToolBox/1.0'})
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                payload = json.loads(resp.read().decode('utf-8'))
+            table = payload.get('holiday') if isinstance(payload, dict) else None
+            if not isinstance(table, dict) or not table:
+                raise ValueError('响应缺少 holiday 表')
+            out = {}
+            for item in table.values():
+                d = str(item.get('date', ''))
+                if re.fullmatch(r'\d{4}-\d{2}-\d{2}', d):
+                    out[d] = not item.get('holiday', True)   # API 语义：holiday=False=调休补班（要上班）
+            if out:
+                return out
+            raise ValueError('holiday 表解析为空')
+        except Exception:
+            if attempt < 2:
+                time.sleep(3)
+    return None
+
+
+def _holiday_load_cache(year: int):
+    try:
+        data = json.loads((HOLIDAY_DIR / f'{year}.json').read_text(encoding='utf-8'))
+        return {str(k): bool(v) for k, v in data.items()} if isinstance(data, dict) and data else None
+    except (OSError, ValueError):
+        return None
+
+
+def _holiday_apply(year: int, table: dict, from_api: bool) -> None:
+    with _HOL_LOCK:
+        _HOL_DATA[year] = table
+        _HOL_SYNCED.add(year)
+    if from_api:   # 仅 API 新鲜数据落盘；缓存回灌不重写
+        try:
+            HOLIDAY_DIR.mkdir(parents=True, exist_ok=True)
+            (HOLIDAY_DIR / f'{year}.json').write_text(
+                json.dumps(table, ensure_ascii=False), encoding='utf-8')
+        except OSError:
+            pass
+
+
+def is_workday(d: date):
+    """None=当年日历未同步（前端按周一~五降级并提示）；True/False=法定日历裁决。"""
+    with _HOL_LOCK:
+        table = _HOL_DATA.get(d.year)
+    if table is None:
+        return None
+    return table.get(d.isoformat(), d.weekday() < 5)
+
+
+def holiday_synced(year: int) -> bool:
+    with _HOL_LOCK:
+        return year in _HOL_SYNCED
+
+
+def holiday_sync_loop():
+    """后台同步循环：当年+次年缺哪年补哪年（国务院安排通常 11 月底发布次年数据），
+    每 6h 一轮兼顾跨年切换与发布滞后。已有年度缓存直接就绪不打 API（法定数据一年不变）；
+    全程纯 daemon 不阻断面板，失败静默等下一轮。"""
+    while True:
+        today = date.today()
+        for y in (today.year, today.year + 1):
+            if holiday_synced(y):
+                continue
+            cache = _holiday_load_cache(y)
+            if cache is not None:
+                _holiday_apply(y, cache, from_api=False)
+                continue
+            table = _holiday_fetch(y)
+            if table is not None:
+                _holiday_apply(y, table, from_api=True)
+        time.sleep(6 * 3600)
+
+
 # ============================== 分组配置 ==============================
 
 def load_config() -> dict:
@@ -538,7 +628,6 @@ def ai_chat_stream(base_url: str, api_key: str, model: str, prompt: str, on_delt
     要求所选模型支持视觉（如 glm-5.3-flash），不支持时厂商会报 4xx 透传前端。
     外部调用三要素：连接/单次读 60s 超时；不做自动重试（流式断点续传无意义，
     已收部分由任务槽保留、错误透传前端）；api_key 只进请求头不入日志。"""
-    import urllib.request
     user_content = prompt
     if images:
         user_content = [{'type': 'text', 'text': prompt}] + [
@@ -1385,6 +1474,24 @@ class Api:
         except OSError as e:
             return {'exists': False, 'text': '', 'updated': '', 'err': str(e)}
 
+    def notice_state(self) -> dict:
+        """顶部提醒通知条聚合状态（一次桥接调用取齐，前端不再逐个 API 拼）：
+        workday: True/False=法定日历裁决；None=当年未同步（前端按周一~五降级并提示）。
+        tutor_done: None=tutor 不可用（agent-study 缺失等，前端跳过学习提醒防误报）。"""
+        today = date.today()
+        state = {'today': today.isoformat(), 'workday': is_workday(today),
+                 'synced': holiday_synced(today.year), 'report_done': False, 'tutor_done': None}
+        try:
+            state['report_done'] = bool(self.report_get(state['today']).get('exists'))
+        except Exception as e:
+            self._dbg(f'notice report check fail: {e}')
+        try:
+            checkin = self._tutor_mods()[0]
+            state['tutor_done'] = today.isoformat() in checkin.load_checkins()
+        except Exception as e:
+            self._dbg(f'notice tutor check fail: {e}')
+        return state
+
     # ---- 学习打卡（agent-study 项目 tutor 包：右下角「学习」widget 数据源，2026-10-08）----
     # tutor 是纯标准库包（3.10+ 语法），直接 sys.path 导入拿结构化数据，
     # 免 subprocess 跑 CLI 再解析文本（中文输出有 GBK/UTF-8 双层转码坑）。
@@ -1582,6 +1689,21 @@ strong { font-weight: 600; }
             stats = checkin.compute_stats()
             return {'ok': True, 'minutes': rec.minutes, 'hours': stats.hours,
                     'total_days': stats.total_days, 'current_streak': stats.current}
+        except Exception as e:
+            return {'ok': False, 'err': str(e)}
+
+    def tutor_delete_checkin(self, day: str) -> dict:
+        """撤回某日学习打卡（tutor.delete_checkin，删错打卡的后悔药）；返回撤回后最新连续统计。"""
+        try:
+            d = str(day or '').strip()
+            if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', d):
+                return {'ok': False, 'err': '日期格式非法'}
+            checkin, _, _, _, _ = self._tutor_mods()
+            if not checkin.delete_checkin(d):
+                return {'ok': False, 'err': '该日无学习打卡记录'}
+            stats = checkin.compute_stats()
+            return {'ok': True, 'total_days': stats.total_days,
+                    'current_streak': stats.current, 'hours': stats.hours}
         except Exception as e:
             return {'ok': False, 'err': str(e)}
 
@@ -2080,6 +2202,8 @@ def main():
         if load_config().get('wechat_shot', True):   # 鼠标侧键截屏素材（设置里可关）
             _G_SHOT = ShotHookThread(api.on_shot_xbutton, api._dbg)
             _G_SHOT.start()
+        # 法定工作日日历后台同步（节假日+调休，通知条日报提醒的判据；失败静默等下一轮）
+        threading.Thread(target=holiday_sync_loop, daemon=True, name='holiday-sync').start()
 
     webview.start(on_ready, gui='edgechromium')   # 必须显式 WebView2 后端（Trident 后端键盘事件失效）
     if _G_HOTKEY:
